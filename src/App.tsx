@@ -81,12 +81,17 @@ function siteKey(email: string) {
 }
 
 function siteSlug(name: string) {
-  return name
+  const slug = name
     .toLowerCase()
     .normalize('NFKD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-|-$/g, '');
+  if (slug) return slug;
+  // Names with no Latin letters (e.g. Arabic, Chinese) still get a stable, working address.
+  let hash = 0;
+  for (const char of name.trim()) hash = (hash * 31 + (char.codePointAt(0) ?? 0)) >>> 0;
+  return name.trim() ? `site-${hash.toString(36)}` : '';
 }
 
 function brandStyle(color: string): BrandStyle {
@@ -622,6 +627,7 @@ function Dashboard({
   onProfileChange: (profile: Profile) => void;
 }) {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [site, setSite] = useState<SiteDraft>(() =>
     profile ? readSite(profile.email) : defaultSite,
   );
@@ -673,7 +679,7 @@ function Dashboard({
       <div className="dashboard-main">
         <header className="dashboard-topbar">
           <button className="mobile-menu-button dashboard-menu" type="button" onClick={() => setMenuOpen((value) => !value)} aria-label="Toggle dashboard menu"><Menu size={19} /></button>
-          <span>Workspace <ChevronDown size={14} /> <i>/</i> Overview</span>
+          <span>Workspace <ChevronDown size={14} /> <i>/</i> {sectionTitle(pathname)}</span>
           <div><span className="dashboard-live"><i className="status-dot" /> Preview mode</span><button className="dashboard-avatar" type="button" onClick={onSignOut} title="Sign out">{profile.name.slice(0, 1).toUpperCase()}</button></div>
         </header>
         <div className="dashboard-content">
@@ -696,11 +702,25 @@ function Dashboard({
   );
 }
 
+function sectionTitle(pathname: string) {
+  const part = pathname.replace(/^\/dashboard\/?/, '').split('/')[0];
+  const titles: Record<string, string> = {
+    sites: 'Sites', domains: 'Domains', deployments: 'Deployments', commissions: 'Commissions',
+    bots: 'Trading bots', strategies: 'Strategies', support: 'Support', settings: 'Settings',
+  };
+  return titles[part] ?? 'Overview';
+}
+
+function greeting() {
+  const hour = new Date().getHours();
+  return hour < 12 ? 'Good morning' : hour < 18 ? 'Good afternoon' : 'Good evening';
+}
+
 function Overview({ profile, site }: { profile: Profile; site: SiteDraft }) {
   const navigate = useNavigate();
   return (
     <div className="workspace-page">
-      <div className="dashboard-page-title"><div><p className="eyebrow">YOUR WORKSPACE</p><h1>Good morning, {profile.name.split(' ')[0]}</h1><p>Here’s a look at your platform and its activity.</p></div><div className="title-actions">{site.name && <Link className="button button-outline" to={`/p/${siteSlug(site.name)}`}><Globe2 size={16} /> View public site</Link>}<button className="button button-gradient" type="button" onClick={() => navigate('/dashboard/sites/new')}><Plus size={16} /> {site.name ? 'Edit your site' : 'Create your site'}</button></div></div>
+      <div className="dashboard-page-title"><div><p className="eyebrow">YOUR WORKSPACE</p><h1>{greeting()}, {profile.name.split(' ')[0]}</h1><p>Here’s a look at your platform and its activity.</p></div><div className="title-actions">{site.name && <Link className="button button-outline" to={`/p/${siteSlug(site.name)}`}><Globe2 size={16} /> View public site</Link>}<button className="button button-gradient" type="button" onClick={() => navigate('/dashboard/sites/new')}><Plus size={16} /> {site.name ? 'Edit your site' : 'Create your site'}</button></div></div>
       <div className="dashboard-kpi-grid">
         <KpiCard icon={<Layers3 />} label="Your sites" value={site.name ? '1' : '0'} note={site.name ? 'One platform configured' : 'Start by creating your first site'} trend="arrow-up" />
         <KpiCard icon={<Wallet />} label="Total commissions" value="$0.00" note="Connect a Deriv account to begin tracking" trend="neutral" />

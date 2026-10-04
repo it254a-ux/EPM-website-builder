@@ -2,6 +2,7 @@
   "name": "epm-platform-prototype",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "description": "A standalone EPM (Executive Prime Markets) platform prototype.",
   "scripts": {
     "dev": "rsbuild dev --port 4003",
