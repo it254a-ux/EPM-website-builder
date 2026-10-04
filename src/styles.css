@@ -1,19 +1,19 @@
 :root {
-  font-family: "DM Sans", sans-serif;
-  color: #17212b;
-  background: #f1f5f6;
+  font-family: "Inter", system-ui, sans-serif;
+  color: #0f1c2e;
+  background: #f6f3ec;
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
-  --ink: #17212b;
-  --muted: #77838c;
-  --muted-dark: #59666f;
-  --line: #e6ebed;
-  --cyan: #27b8d5;
-  --blue: #2346d8;
-  --soft: #f5f8f9;
+  --ink: #0f1c2e;
+  --muted: #6b7684;
+  --muted-dark: #4a5666;
+  --line: #e8e2d4;
+  --cyan: #a9792a;
+  --blue: #c9a24b;
+  --soft: #faf7f0;
   --card: #fff;
-  --navy: #17252e;
+  --navy: #0b1f3a;
   --green: #19a57a;
   --shadow: 0 14px 40px rgba(42, 61, 69, 0.09);
   --shadow-small: 0 7px 20px rgba(42, 61, 69, 0.08);
@@ -26,24 +26,23 @@
 html {
   min-width: 320px;
   scroll-behavior: smooth;
-  scrollbar-color: #87cbd5 #edf1f2;
+  scrollbar-color: #c9a24b #efe9db;
 }
 
 body {
   min-width: 320px;
   margin: 0;
   background:
-    linear-gradient(rgba(43, 90, 112, 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(43, 90, 112, 0.025) 1px, transparent 1px),
-    #f1f5f6;
-  background-size: 64px 64px;
+    radial-gradient(ellipse at 50% -10%, rgba(201, 162, 75, 0.16), transparent 55%),
+    #f6f3ec;
+  background-size: auto;
 }
 
 body,
 button,
 input,
 textarea {
-  font-family: "DM Sans", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
 }
 
 button,
@@ -61,7 +60,7 @@ button:focus-visible,
 a:focus-visible,
 input:focus-visible,
 textarea:focus-visible {
-  outline: 3px solid rgba(39, 184, 213, 0.4);
+  outline: 3px solid rgba(201, 162, 75, 0.4);
   outline-offset: 3px;
 }
 
@@ -112,7 +111,7 @@ button {
   align-items: center;
   gap: 8px;
   color: var(--cyan);
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 1.35rem;
   font-weight: 800;
   letter-spacing: -0.06em;
@@ -252,13 +251,13 @@ button {
 }
 
 .button-gradient {
-  background: linear-gradient(110deg, #4fd1e5, #249dda 47%, #203cc9);
-  box-shadow: 0 8px 18px rgba(35, 90, 207, 0.19);
+  background: linear-gradient(120deg, #1b3f6e, #0b1f3a 60%, #071428);
+  box-shadow: 0 8px 18px rgba(11, 31, 58, 0.22);
   color: #fff;
 }
 
 .button-gradient:hover {
-  box-shadow: 0 11px 23px rgba(35, 90, 207, 0.25);
+  box-shadow: 0 11px 23px rgba(11, 31, 58, 0.3);
 }
 
 .nav-get-started {
@@ -278,14 +277,14 @@ button {
 }
 
 .button-outline {
-  border-color: #dce5e8;
+  border-color: #e4dcc8;
   background: white;
   color: #394750;
 }
 
 .button-outline:hover {
-  border-color: #a5cdd6;
-  background: #fbfefe;
+  border-color: #d9c48e;
+  background: #faf4e4;
 }
 
 .button-full {
@@ -298,7 +297,7 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 9px;
-  color: #238cab;
+  color: #8a6420;
   font-size: 0.9rem;
   font-weight: 700;
   transition: gap 150ms ease;
@@ -348,8 +347,8 @@ button {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: linear-gradient(140deg, #35d1df, #2670d8);
-  box-shadow: 0 0 0 4px rgba(39, 184, 213, 0.09);
+  background: linear-gradient(140deg, #dcbb6a, #a9792a);
+  box-shadow: 0 0 0 4px rgba(201, 162, 75, 0.09);
 }
 
 .hero h1,
@@ -357,7 +356,7 @@ button {
 .auth-promo h1 {
   margin: 0;
   color: #182128;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: clamp(3.05rem, 5.2vw, 5rem);
   font-weight: 800;
   letter-spacing: -0.073em;
@@ -366,7 +365,7 @@ button {
 
 .hero h1 span {
   display: block;
-  background: linear-gradient(95deg, #28b9dd 0%, #2582d8 48%, #263fc6 100%);
+  background: linear-gradient(95deg, #a9792a 0%, #c9a24b 50%, #8a6420 100%);
   background-clip: text;
   -webkit-text-fill-color: transparent;
 }
@@ -397,7 +396,7 @@ button {
 }
 
 .trust-note svg {
-  color: #35a99a;
+  color: #8a6420;
 }
 
 .preview-stage {
@@ -413,7 +412,7 @@ button {
 .preview-orbit {
   position: absolute;
   z-index: -1;
-  border: 1px solid rgba(42, 185, 213, 0.14);
+  border: 1px solid rgba(201, 162, 75, 0.14);
   border-radius: 50%;
 }
 
@@ -425,7 +424,7 @@ button {
 .orbit-two {
   width: 520px;
   height: 520px;
-  border-color: rgba(38, 85, 191, 0.07);
+  border-color: rgba(11, 31, 58, 0.07);
 }
 
 .preview-window {
@@ -474,11 +473,11 @@ button {
 }
 
 .window-dots i:nth-child(2) {
-  background: #50cad7;
+  background: #c9a24b;
 }
 
 .window-dots i:nth-child(3) {
-  background: #b8c5fa;
+  background: #efe3c2;
 }
 
 .window-lock {
@@ -522,7 +521,7 @@ button {
 }
 
 .preview-sidebar .sidebar-active {
-  background: #29b8d3;
+  background: #c9a24b;
   color: white;
 }
 
@@ -530,7 +529,7 @@ button {
   width: 20px;
   height: 20px;
   border-radius: 6px;
-  background: #dff7fb;
+  background: #efe3c2;
   font-size: 0.69rem;
   font-weight: 800;
 }
@@ -557,7 +556,7 @@ button {
 
 .preview-greeting b {
   color: #25323a;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 1rem;
 }
 
@@ -581,12 +580,12 @@ button {
 
 .preview-kpis b {
   color: #26333b;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 1rem;
 }
 
 .preview-kpis small {
-  color: #1aa481;
+  color: #8a6420;
   font-size: 0.55rem;
 }
 
@@ -670,7 +669,7 @@ button {
   place-items: center;
   border-radius: 10px;
   background: #e4f7f1;
-  color: #199b75;
+  color: #8a6420;
 }
 
 .earnings-float div {
@@ -734,8 +733,8 @@ button {
 }
 
 .stats-inner b {
-  color: #29afd0;
-  font-family: "Manrope", sans-serif;
+  color: #c9a24b;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 2rem;
   letter-spacing: -0.05em;
 }
@@ -765,7 +764,7 @@ button {
 .values-heading h2 {
   margin: 0;
   color: #1a252c;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: clamp(1.8rem, 3.5vw, 2.8rem);
   font-weight: 750;
   letter-spacing: -0.055em;
@@ -802,7 +801,7 @@ button {
 }
 
 .value-card:hover {
-  border-color: #cee8ed;
+  border-color: #efe3c2;
   box-shadow: var(--shadow-small);
   transform: translateX(3px);
 }
@@ -813,10 +812,10 @@ button {
   height: 42px;
   flex-shrink: 0;
   place-items: center;
-  border: 1px solid #e1f2f5;
+  border: 1px solid #efe3c2;
   border-radius: 12px;
-  background: #ebf8fa;
-  color: #219bb6;
+  background: #faf4e4;
+  color: #8a6420;
 }
 
 .icon-box svg {
@@ -827,7 +826,7 @@ button {
 .value-card h3 {
   margin: 0 0 4px;
   color: #26343c;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 0.94rem;
 }
 
@@ -855,8 +854,8 @@ button {
   border: 1px solid #e4edf0;
   border-radius: 19px;
   background:
-    radial-gradient(ellipse at 85% 15%, rgba(38, 184, 213, 0.13), transparent 43%),
-    linear-gradient(112deg, #fff, #f5fafb);
+    radial-gradient(ellipse at 85% 15%, rgba(201, 162, 75, 0.13), transparent 43%),
+    linear-gradient(112deg, #fff, #faf6ea);
   box-shadow: 0 12px 30px rgba(41, 66, 78, 0.06);
 }
 
@@ -871,8 +870,8 @@ button {
 
 .site-footer {
   padding: 51px 32px 19px;
-  border-top: 1px solid #e2e9eb;
-  background: rgba(248, 250, 250, 0.76);
+  border-top: 1px solid #e8e2d4;
+  background: rgba(250, 247, 240, 0.9);
 }
 
 .footer-top {
@@ -910,7 +909,7 @@ button {
 }
 
 .footer-col a:hover {
-  color: #158fad;
+  color: #8a6420;
 }
 
 .footer-bottom {
@@ -988,8 +987,8 @@ button {
   height: 41px;
   place-items: center;
   border-radius: 12px;
-  background: #e9f7f9;
-  color: #1b9cb8;
+  background: #faf4e4;
+  color: #8a6420;
 }
 
 .step-icon svg {
@@ -1008,7 +1007,7 @@ button {
   z-index: 1;
   margin: 0 0 11px;
   color: #26333a;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 1.1rem;
   letter-spacing: -0.03em;
 }
@@ -1026,8 +1025,8 @@ button {
   position: absolute;
   right: 10px;
   bottom: -24px;
-  color: rgba(39, 184, 213, 0.055);
-  font-family: "Manrope", sans-serif;
+  color: rgba(201, 162, 75, 0.055);
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 8rem;
   font-weight: 800;
   line-height: 1;
@@ -1060,7 +1059,7 @@ button {
 .contact-form h2 {
   margin: 0;
   color: #26333a;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 1.37rem;
   letter-spacing: -0.04em;
 }
@@ -1098,7 +1097,7 @@ button {
 }
 
 .video-row:hover {
-  background: #f7fbfc;
+  background: #faf4e4;
 }
 
 .video-row > span:nth-child(2) {
@@ -1115,8 +1114,8 @@ button {
   flex-shrink: 0;
   place-items: center;
   border-radius: 50%;
-  background: #e8f7fa;
-  color: #1998b5;
+  background: #faf4e4;
+  color: #8a6420;
 }
 
 .video-duration {
@@ -1137,7 +1136,7 @@ button {
   padding: 29px 31px;
   border: 1px solid #e2eaed;
   border-radius: 16px;
-  background: linear-gradient(110deg, white, #eff9fb);
+  background: linear-gradient(110deg, white, #faf4e4);
 }
 
 .cta-strip h2 {
@@ -1169,7 +1168,7 @@ button {
 }
 
 .feature-card:hover {
-  border-color: #cee6eb;
+  border-color: #efe3c2;
   box-shadow: var(--shadow-small);
   transform: translateY(-3px);
 }
@@ -1182,14 +1181,14 @@ button {
 
 .feature-index {
   color: #b2bdc1;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 0.7rem;
   font-weight: 800;
 }
 
 .feature-tag {
   margin: 18px 0 5px;
-  color: #1792ae;
+  color: #8a6420;
   font-size: 0.59rem;
   font-weight: 800;
   letter-spacing: 0.12em;
@@ -1200,7 +1199,7 @@ button {
   z-index: 1;
   margin: 0 0 8px;
   color: #293840;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 1.05rem;
   letter-spacing: -0.03em;
 }
@@ -1219,7 +1218,7 @@ button {
   position: absolute;
   right: -10px;
   bottom: -21px;
-  color: rgba(35, 166, 189, 0.055);
+  color: rgba(201, 162, 75, 0.055);
   transform: rotate(-12deg) scale(3.4);
 }
 
@@ -1259,7 +1258,7 @@ button {
   max-width: 650px;
   margin: 0 0 15px;
   color: #243139;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: clamp(1.6rem, 3vw, 2.25rem);
   letter-spacing: -0.055em;
 }
@@ -1277,7 +1276,7 @@ button {
   flex-direction: column;
   justify-content: center;
   background:
-    radial-gradient(circle at 92% 3%, rgba(39, 184, 213, 0.14), transparent 45%),
+    radial-gradient(circle at 92% 3%, rgba(201, 162, 75, 0.14), transparent 45%),
     rgba(255, 255, 255, 0.78);
 }
 
@@ -1286,8 +1285,8 @@ button {
 }
 
 .mission-stat > b {
-  color: #1ea9cb;
-  font-family: "Manrope", sans-serif;
+  color: #c9a24b;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 2.6rem;
   letter-spacing: -0.07em;
 }
@@ -1312,7 +1311,7 @@ button {
   width: 72%;
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #43d0d7, #306ad9);
+  background: linear-gradient(90deg, #dcbb6a, #a9792a);
 }
 
 .mission-stat small {
@@ -1423,9 +1422,9 @@ button {
 .auth-form input:focus,
 .wizard-form input:focus,
 .settings-form input:focus {
-  border-color: #76cddd;
+  border-color: #d9b765;
   background: #fff;
-  box-shadow: 0 0 0 3px rgba(39, 184, 213, 0.09);
+  box-shadow: 0 0 0 3px rgba(201, 162, 75, 0.09);
   outline: none;
 }
 
@@ -1446,13 +1445,13 @@ button {
 
 .whatsapp-card .eyebrow {
   margin: 16px 0 6px;
-  color: #39927f;
+  color: #8a6420;
 }
 
 .whatsapp-card h2 {
   margin: 0;
   color: #293a40;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 1.3rem;
 }
 
@@ -1473,7 +1472,7 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  color: #198d6d;
+  color: #8a6420;
   font-size: 0.78rem;
   font-weight: 750;
 }
@@ -1540,7 +1539,7 @@ button {
 .legal-notice h2 {
   margin: 18px 0 8px;
   color: #26363d;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 1.3rem;
 }
 
@@ -1647,7 +1646,7 @@ button {
 }
 
 .auth-back:hover {
-  color: #168eaa;
+  color: #8a6420;
 }
 
 .auth-form-icon {
@@ -1661,7 +1660,7 @@ button {
 .auth-form > h2 {
   margin: 0;
   color: #26343b;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 1.8rem;
   letter-spacing: -0.055em;
 }
@@ -1710,12 +1709,12 @@ button {
   width: 16px;
   height: 16px;
   margin: 2px 0 0;
-  accent-color: #239dbb;
+  accent-color: #8a6420;
 }
 
 .checkbox-row a,
 .auth-switch a {
-  color: #168eaa;
+  color: #8a6420;
   font-weight: 700;
 }
 
@@ -1793,7 +1792,7 @@ button {
 }
 
 .prototype-stamp svg {
-  color: #27a8c3;
+  color: #c9a24b;
 }
 
 .dashboard-shell {
@@ -1865,9 +1864,9 @@ button {
   flex-shrink: 0;
   place-items: center;
   border-radius: 9px;
-  background: linear-gradient(135deg, #54cfe0, #3495d6);
+  background: linear-gradient(135deg, #dcbb6a, #a9792a);
   color: white;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 0.8rem;
   font-weight: 800;
 }
@@ -1912,12 +1911,12 @@ button {
 
 .dashboard-nav > a:hover {
   background: #f2f8f9;
-  color: #278fa7;
+  color: #8a6420;
 }
 
 .dashboard-nav > a.active {
-  background: #eaf7f9;
-  color: #168fac;
+  background: #faf4e4;
+  color: #8a6420;
 }
 
 .dashboard-nav > a > span:nth-child(2) {
@@ -1969,7 +1968,7 @@ button {
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  color: #188ba6;
+  color: #8a6420;
   font-size: 0.65rem;
   font-weight: 750;
 }
@@ -1991,8 +1990,8 @@ button {
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: linear-gradient(140deg, #d2eff4, #8dc9d7);
-  color: #337887;
+  background: linear-gradient(140deg, #f6ebcf, #d9b765);
+  color: #8a6420;
 }
 
 .sidebar-user > svg {
@@ -2060,8 +2059,8 @@ button {
   place-items: center;
   border: 0;
   border-radius: 50%;
-  background: #dff3f6;
-  color: #1889a3;
+  background: #efe3c2;
+  color: #8a6420;
   cursor: pointer;
   font-weight: 800;
 }
@@ -2099,7 +2098,7 @@ button {
 .wizard-header h1 {
   margin: 0;
   color: #202d34;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: clamp(1.65rem, 3vw, 2.3rem);
   font-weight: 800;
   letter-spacing: -0.06em;
@@ -2170,7 +2169,7 @@ button {
   overflow: hidden;
   margin: 4px 0;
   color: #26353c;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: clamp(1.35rem, 2.1vw, 1.8rem);
   letter-spacing: -0.06em;
   text-overflow: ellipsis;
@@ -2208,7 +2207,7 @@ button {
 .panel-heading h2 {
   margin: 0;
   color: #344149;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 0.93rem;
   letter-spacing: -0.025em;
 }
@@ -2238,7 +2237,7 @@ button {
   overflow: hidden;
   border: 1px dashed #e0e9eb;
   border-radius: 9px;
-  background: linear-gradient(180deg, #fcfefe, #fafcfc);
+  background: linear-gradient(180deg, #faf4e4, #fafcfc);
 }
 
 .empty-chart-center {
@@ -2283,10 +2282,10 @@ button {
   height: 35px;
   align-items: center;
   justify-content: center;
-  border: 2px solid #d9f0f2;
-  border-top-color: #28b4cf;
+  border: 2px solid #efe3c2;
+  border-top-color: #c9a24b;
   border-radius: 50%;
-  color: #398c9c;
+  color: #8a6420;
   font-size: 0.65rem;
   font-weight: 800;
 }
@@ -2329,9 +2328,9 @@ button {
 }
 
 .check-step.current {
-  border-color: #8ad2de;
-  background: #eef9fa;
-  color: #238da2;
+  border-color: #d9b765;
+  background: #faf4e4;
+  color: #8a6420;
 }
 
 .check-step.done {
@@ -2396,10 +2395,10 @@ button {
   height: 60px;
   place-items: center;
   margin-bottom: 13px;
-  border: 1px solid #e0f0f2;
+  border: 1px solid #efe3c2;
   border-radius: 18px;
-  background: #eff9fa;
-  color: #36abc1;
+  background: #faf4e4;
+  color: #c9a24b;
 }
 
 .empty-illustration svg {
@@ -2411,7 +2410,7 @@ button {
 .commissions-empty h2 {
   margin: 0;
   color: #35434a;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 1.2rem;
   letter-spacing: -0.035em;
 }
@@ -2440,7 +2439,7 @@ button {
   place-items: center;
   border-radius: 12px;
   color: white;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 1.15rem;
   font-weight: 800;
 }
@@ -2454,7 +2453,7 @@ button {
   overflow: hidden;
   margin: 0;
   color: #36444b;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 0.94rem;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -2500,8 +2499,8 @@ button {
 }
 
 .outline-small:hover {
-  border-color: #8fd3dd;
-  color: #178ba4;
+  border-color: #d9b765;
+  color: #8a6420;
 }
 
 .back-link {
@@ -2519,7 +2518,7 @@ button {
 }
 
 .back-link:hover {
-  color: #178eaa;
+  color: #8a6420;
 }
 
 .wizard-header {
@@ -2535,7 +2534,7 @@ button {
   border: 1px solid #e5edef;
   border-radius: 8px;
   background: white;
-  color: #3d9eb0;
+  color: #c9a24b;
   font-size: 0.66rem;
   font-weight: 800;
   letter-spacing: 0.07em;
@@ -2578,11 +2577,11 @@ button {
 }
 
 .wizard-step.active {
-  color: #288da3;
+  color: #8a6420;
 }
 
 .wizard-step.active::after {
-  background: #35b6cd;
+  background: #c9a24b;
 }
 
 .wizard-step.complete {
@@ -2603,9 +2602,9 @@ button {
 }
 
 .wizard-step.active > span {
-  border-color: #80cbd7;
-  background: #eef9fa;
-  color: #198aa1;
+  border-color: #d9b765;
+  background: #faf4e4;
+  color: #8a6420;
 }
 
 .wizard-step.complete > span {
@@ -2632,7 +2631,7 @@ button {
 .wizard-form-heading h2 {
   margin: 0;
   color: #34434a;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 1.02rem;
 }
 
@@ -2696,7 +2695,7 @@ button {
   border-radius: 10px;
   background: var(--brand-accent);
   color: #fff;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-weight: 800;
 }
 
@@ -2741,7 +2740,7 @@ button {
 
 .domain-note svg {
   flex-shrink: 0;
-  color: #439bac;
+  color: #c9a24b;
 }
 
 .review-list {
@@ -2842,7 +2841,7 @@ button {
 
 .split-example b {
   color: #3b4a51;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 1.05rem;
 }
 
@@ -2874,7 +2873,7 @@ button {
 }
 
 .settlement-steps > div > span {
-  color: #239bb4;
+  color: #8a6420;
   font-size: 0.58rem;
   font-weight: 800;
   letter-spacing: 0.12em;
@@ -2882,7 +2881,7 @@ button {
 
 .settlement-steps b {
   color: #44535a;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 0.74rem;
 }
 
@@ -2935,7 +2934,7 @@ button {
 .support-cards h2 {
   margin: 0;
   color: #34434a;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 1.02rem;
 }
 
@@ -2991,7 +2990,7 @@ button {
   align-items: center;
   gap: 9px;
   color: #25343b;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 1.04rem;
   font-weight: 800;
   letter-spacing: -0.035em;
@@ -3061,7 +3060,7 @@ button {
   max-width: 780px;
   margin: 12px 0 0;
   color: #1e2b32;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: clamp(2.3rem, 5.5vw, 4.45rem);
   font-weight: 800;
   letter-spacing: -0.075em;
@@ -3113,7 +3112,7 @@ button {
 .public-section-heading h2 {
   margin: 0;
   color: #2c3b42;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 1.42rem;
   letter-spacing: -0.04em;
 }
@@ -3170,7 +3169,7 @@ button {
 .market-card h3 {
   margin: 13px 0 6px;
   color: #3b494f;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 0.82rem;
 }
 
@@ -3183,7 +3182,7 @@ button {
 
 .market-price b {
   color: #415159;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 0.86rem;
 }
 
@@ -3239,7 +3238,7 @@ button {
 .public-about h2 {
   margin: 0;
   color: #3a484f;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
   font-size: 0.92rem;
 }
 
@@ -3333,7 +3332,7 @@ button {
 
 .not-found h1 {
   margin: 15px 0 0;
-  font-family: "Manrope", sans-serif;
+  font-family: "Inter", system-ui, sans-serif;
 }
 
 .not-found p {
@@ -3468,7 +3467,7 @@ button {
 
   .nav-links > a:hover,
   .nav-links > a.active {
-    background: #f0f9fa;
+    background: #faf4e4;
   }
 
   .nav-mobile-account {
@@ -4294,3 +4293,78 @@ button {
     animation-iteration-count: 1 !important;
   }
 }
+
+
+/* ===== Premium theme: navy / gold, serif headlines, tighter rhythm ===== */
+.hero h1,
+.page-heading h1,
+.auth-promo h1,
+.home-value h2,
+.bottom-cta h2,
+.cta-strip h2,
+.mission-copy h2,
+.values-heading h2,
+.page-heading h2,
+.faq-panel h2,
+.contact-form h2 {
+  font-family: "Playfair Display", Georgia, "Times New Roman", serif;
+  font-weight: 600;
+  letter-spacing: -0.012em;
+  line-height: 1.12;
+}
+
+.hero h1 { font-size: clamp(2.4rem, 4.6vw, 3.9rem); }
+.page-heading h1 { font-size: clamp(2.1rem, 4.6vw, 3.3rem); }
+.home-value h2,
+.bottom-cta h2,
+.cta-strip h2,
+.mission-copy h2 { font-size: clamp(1.55rem, 2.6vw, 2.15rem); }
+
+.brand { font-family: "Playfair Display", Georgia, serif; letter-spacing: 0; color: var(--navy); }
+.brand-mark { color: var(--cyan); }
+.nav-pill { border-color: rgba(201, 162, 75, 0.35); }
+.eyebrow { letter-spacing: 0.14em; }
+
+/* Tighter vertical rhythm so pages feel composed, not scattered */
+.marketing-main { min-height: 0; }
+.site-header { padding-top: 12px; }
+.hero { min-height: 0; margin-top: 4px; padding: clamp(24px, 3.4vw, 40px) 20px clamp(26px, 3.4vw, 40px); }
+.section-grid { gap: clamp(18px, 3vw, 34px); }
+.hero-description { margin-top: 14px; }
+.hero-actions { margin-top: 20px; gap: 20px; }
+.trust-note { margin-top: 16px; }
+.stats-band { padding: 14px 24px; }
+.home-value { margin: clamp(30px, 4.2vw, 46px) auto; padding: 0; }
+.value-card { min-height: 0; padding: 14px 16px; }
+.bottom-cta { margin-bottom: clamp(30px, 4vw, 44px); padding: clamp(20px, 3vw, 28px) clamp(20px, 3.4vw, 34px); }
+.page-wrap { padding: clamp(32px, 4.2vw, 46px) 0 clamp(36px, 4.8vw, 52px); }
+.page-heading { margin-bottom: clamp(18px, 2.8vw, 28px); }
+.steps-grid, .features-grid { gap: 12px; }
+.step-card { min-height: 0; padding: 20px 20px 22px; }
+.feature-card { min-height: 0; padding: 20px; }
+.learn-section, .plans-section { margin-top: 30px; }
+.cta-strip { margin-top: 30px; padding: 22px 26px; }
+.values-grid { gap: 12px; }
+.site-footer { padding: 34px 28px 16px; }
+.footer-top { margin-bottom: 20px; gap: clamp(18px, 3vw, 28px); }
+
+.plans-section .values-heading { margin-bottom: 16px; text-align: center; }
+.plans-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+.plans-grid .feature-card { min-height: 0; }
+@media (max-width: 720px) { .plans-grid { grid-template-columns: 1fr; } }
+
+.footer-risk {
+  width: min(1120px, 100%);
+  margin: 0 auto 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+  color: var(--muted-dark);
+  font-size: 0.74rem;
+  line-height: 1.6;
+}
+
+.stats-inner b { color: #8a6420; font-family: "Playfair Display", Georgia, serif; font-weight: 600; letter-spacing: -0.01em; }
+
+.plans-grid .feature-card p { max-width: none; }
+.plans-grid .feature-index { color: #8a6420; font-family: "Playfair Display", Georgia, serif; font-size: 1.5rem; font-weight: 600; }
+.step-watermark { opacity: 0.55; }

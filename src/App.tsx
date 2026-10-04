@@ -151,14 +151,8 @@ function App() {
           <Route path="features" element={<FeaturesPage />} />
           <Route path="about" element={<AboutPage />} />
           <Route path="contact" element={<ContactPage />} />
-          <Route
-            path="signup"
-            element={<AuthPage mode="signup" onAuthenticated={setProfile} />}
-          />
-          <Route
-            path="login"
-            element={<AuthPage mode="login" onAuthenticated={setProfile} />}
-          />
+          <Route path="signup" element={<ExternalRedirect to={OWNER_URL} />} />
+          <Route path="login" element={<ExternalRedirect to={OWNER_URL} />} />
           <Route path="privacy" element={<LegalPage kind="privacy" />} />
           <Route path="terms" element={<LegalPage kind="terms" />} />
         </Route>
@@ -175,10 +169,6 @@ function App() {
         <Route path="/p/:siteSlug" element={<PublicTradingSite />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
-      <div className="prototype-stamp">
-        <Sparkles size={13} />
-        <span>Product preview</span>
-      </div>
     </div>
   );
 }
@@ -255,10 +245,10 @@ function AccountLinks({
   }
   return (
     <>
-      <Link className="signin-link" to="/login"><LogIn size={15} /> Sign In</Link>
-      <Link className="button button-gradient nav-get-started" to="/signup">
+      <a className="signin-link" href={OWNER_URL}><LogIn size={15} /> Sign In</a>
+      <a className="button button-gradient nav-get-started" href={OWNER_URL}>
         <Users size={15} /> Get Started
-      </Link>
+      </a>
     </>
   );
 }
@@ -288,28 +278,43 @@ function PageWrap({
   );
 }
 
+const OWNER_URL = 'https://executiveprimemarkets.site/owner';
+const WHATSAPP_NUMBER = '254705491022';
+
+function ExternalRedirect({ to }: { to: string }) {
+  useEffect(() => {
+    window.location.replace(to);
+  }, [to]);
+  return (
+    <PageWrap title="Taking you to your account" intro="One moment while we open the secure sign-in page.">
+      <a className="button button-gradient" href={to}>Continue <ArrowRight size={16} /></a>
+    </PageWrap>
+  );
+}
+
 function HomePage() {
   return (
     <>
       <section className="hero section-grid">
         <div className="hero-copy">
-          <p className="eyebrow"><span /> YOUR PLATFORM. YOUR BRAND.</p>
-          <h1>Launch Your Own <span>Deriv Trading Platform</span></h1>
+          <p className="eyebrow"><span /> WHITE-LABEL DERIV PLATFORM</p>
+          <h1>Your own Deriv trading platform, <span>under your brand.</span></h1>
           <p className="hero-description">
-            Customize it your way, launch in minutes and earn from every trade.
-            No coding needed. Every trader, every opportunity.
+            Launch a branded trading site in minutes. Choose your name, logo and
+            colours, give your clients the complete Deriv bot builder and analysis
+            tools, and keep up to 85% of the commission your platform generates.
           </p>
           <div className="hero-actions">
-            <Link className="button button-gradient button-large" to="/signup">
-              Create Your Platform <ArrowRight size={18} />
-            </Link>
+            <a className="button button-gradient button-large" href={OWNER_URL}>
+              Create your platform <ArrowRight size={18} />
+            </a>
             <Link className="text-link" to="/how-it-works">
               See how it works <ArrowRight size={16} />
             </Link>
           </div>
           <div className="trust-note">
             <ShieldCheck size={17} />
-            Build your brand with a guided setup—no code required
+            Free to start · No coding required · Live the moment you create your site
           </div>
         </div>
         <PlatformPreview />
@@ -317,30 +322,31 @@ function HomePage() {
       <Stats />
       <section className="home-value section-grid">
         <div>
-          <p className="eyebrow"><span /> FROM IDEA TO LAUNCH</p>
-          <h2>Your trading brand, built on a proven foundation.</h2>
+          <p className="eyebrow"><span /> WHY EPM</p>
+          <h2>A complete trading brand, without building the technology.</h2>
           <p>
-            Create a branded trading destination, configure the tools your
-            community needs, and follow performance from one owner dashboard.
+            EPM supplies the infrastructure: Deriv sign-in, a visual bot builder,
+            market analysis tools and a ready-made strategy library. You bring the
+            brand and the audience, and manage your platform from one dashboard.
           </p>
           <Link className="button button-dark" to="/how-it-works">
             Explore the process <ArrowRight size={17} />
           </Link>
         </div>
         <div className="value-card-list">
-          <ValueCard icon={<Palette />} title="Make it yours" detail="Your logo, colors, domain, and platform identity." />
-          <ValueCard icon={<Blocks />} title="Tools in one place" detail="Bots, market analysis, strategies, and support." />
-          <ValueCard icon={<BarChart3 />} title="See the full picture" detail="A clear overview of platform and commission activity." />
+          <ValueCard icon={<Palette />} title="Your identity, front and centre" detail="Your name, logo, colours and typeface, plus your own About, Vision and Mission pages." />
+          <ValueCard icon={<Blocks />} title="Professional tools included" detail="Bot builder, analysis tool and a free strategy library, all maintained by EPM." />
+          <ValueCard icon={<BarChart3 />} title="Clear, agreed earnings" detail="A fixed commission split set in advance and paid out monthly." />
         </div>
       </section>
       <section className="bottom-cta">
         <div>
-          <p className="eyebrow"><span /> READY WHEN YOU ARE</p>
-          <h2>Make room for your next big idea.</h2>
+          <p className="eyebrow"><span /> READY TO START</p>
+          <h2>Put your name on your own trading platform.</h2>
         </div>
-        <Link className="button button-gradient button-large" to="/signup">
-          Get Started <ArrowRight size={18} />
-        </Link>
+        <a className="button button-gradient button-large" href={OWNER_URL}>
+          Get started <ArrowRight size={18} />
+        </a>
       </section>
     </>
   );
@@ -371,23 +377,23 @@ function PlatformPreview() {
             <div className="preview-greeting"><span>ILLUSTRATIVE WORKSPACE</span><b>Your platform at a glance</b></div>
             <div className="preview-kpis">
               <div><span>Site setup</span><b>Preview</b></div>
-              <div><span>Commission activity</span><b>—</b><small>Connect partner data to see activity</small></div>
+              <div><span>Commission activity</span><b>—</b><small>Appears once your platform is live</small></div>
             </div>
             <div className="preview-chart-head"><b>Platform activity</b><span>Last 7 days⌄</span></div>
             <div className="preview-chart">
               <div className="chart-grid-lines" />
               <svg viewBox="0 0 450 138" preserveAspectRatio="none" aria-label="Illustrative trading platform activity chart">
-                <defs><linearGradient id="area-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#29c0dc" stopOpacity=".25" /><stop offset="1" stopColor="#29c0dc" stopOpacity="0" /></linearGradient></defs>
+                <defs><linearGradient id="area-fill" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#c9a24b" stopOpacity=".25" /><stop offset="1" stopColor="#c9a24b" stopOpacity="0" /></linearGradient></defs>
                 <path d="M0 108 C34 97 38 112 66 92 S105 103 137 77 S168 83 196 62 S231 81 264 47 S297 66 325 38 S370 55 402 20 S425 31 450 10 L450 138 L0 138 Z" fill="url(#area-fill)" />
-                <path d="M0 108 C34 97 38 112 66 92 S105 103 137 77 S168 83 196 62 S231 81 264 47 S297 66 325 38 S370 55 402 20 S425 31 450 10" fill="none" stroke="#199fc7" strokeWidth="3" />
+                <path d="M0 108 C34 97 38 112 66 92 S105 103 137 77 S168 83 196 62 S231 81 264 47 S297 66 325 38 S370 55 402 20 S425 31 450 10" fill="none" stroke="#a9792a" strokeWidth="3" />
               </svg>
-              <div className="chart-labels"><span>Oct 06</span><span>Oct 07</span><span>Oct 08</span><span>Oct 09</span><span>Oct 10</span><span>Oct 11</span><span>Oct 12</span></div>
+              <div className="chart-labels"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div>
             </div>
           </div>
         </div>
       </div>
       <div className="floating-card earnings-float"><span><TrendingUp size={16} /></span><div><small>Settlement schedule</small><b>Monthly · preview</b></div><ArrowRight size={16} /></div>
-      <div className="floating-card live-float"><i className="status-dot" /> No live trades connected</div>
+      <div className="floating-card live-float"><i className="status-dot" /> Illustrative preview</div>
     </div>
   );
 }
@@ -396,9 +402,9 @@ function Stats() {
   return (
     <section className="stats-band">
       <div className="stats-inner">
-        <div><b>500+</b><span>Sites created</span></div>
-        <div><b>2M+</b><span>Traders served</span></div>
-        <div><b>$10M+</b><span>Commissions paid</span></div>
+        <div><b>75%</b><span>Your share on a free address</span></div>
+        <div><b>85%</b><span>Your share on your own domain</span></div>
+        <div><b>Instant</b><span>Free sites go live on creation</span></div>
       </div>
     </section>
   );
@@ -409,15 +415,15 @@ function ValueCard({ icon, title, detail }: { icon: ReactNode; title: string; de
 }
 
 const steps = [
-  { number: '01', icon: <Layers3 />, title: 'Create Your Site', text: 'Set up your foundational identity. Choose your custom name, define your brand tone, and connect your preferred domain effortlessly.' },
-  { number: '02', icon: <Palette />, title: 'Configure & Brand', text: 'Upload your high-res logo, customize color palettes to match your corporate identity, and structure your trading platform tabs.' },
-  { number: '03', icon: <Rocket />, title: 'Deploy', text: 'Experience seamless execution with our one-click deployment architecture. Your platform goes live on global edge networks instantly.' },
-  { number: '04', icon: <BarChart3 />, title: 'Earn Commissions', text: 'Eligible trades accrue through the month. After the Deriv partner payment is received and reconciled, your agreed site-owner share can be settled.' },
+  { number: '01', icon: <Layers3 />, title: 'Create your account', text: 'Sign up and choose how to launch: a free address on our domain, or your own domain such as trade.yourbrand.com.' },
+  { number: '02', icon: <Palette />, title: 'Brand your platform', text: 'Add your name, logo, colours and typeface, and write your About, Vision and Mission. Own-domain sites also add their own support contacts.' },
+  { number: '03', icon: <Rocket />, title: 'Go live', text: 'Free sites go live the moment you create them. Own-domain sites are reviewed, connected and activated by our team.' },
+  { number: '04', icon: <BarChart3 />, title: 'Earn commission', text: 'Commission from your clients’ trading activity accrues through the month. Once Deriv’s monthly partner payment is received and reconciled, your agreed share is paid out.' },
 ];
 
 function HowItWorksPage() {
   return (
-    <PageWrap eyebrow="A SIMPLE PATH TO LAUNCH" title="How It Works" intro="Launch your custom trading platform in four simple steps. Eligible trade activity accrues through the month, with owner settlements after the Deriv partner payout is received." className="how-page">
+    <PageWrap eyebrow="FROM SIGN-UP TO LIVE" title="How it works" intro="Four steps take you from sign-up to a live, branded platform. Commission accrues monthly and is paid out once Deriv’s partner payment has been received." className="how-page">
       <div className="steps-grid">
         {steps.map((step) => (
           <article className="step-card" key={step.number}>
@@ -427,33 +433,38 @@ function HowItWorksPage() {
           </article>
         ))}
       </div>
-      <section className="learn-section">
-        <div className="learn-heading"><span className="icon-box"><Play size={19} /></span><div><p className="eyebrow">WATCH & LEARN</p><h2>Build with confidence</h2><p>Follow along with step-by-step video guides for every feature.</p></div></div>
-        <div className="video-list">
-          {['Create & Deploy Your Site', 'Purchase & Renew Domains', 'Connect External Domains', 'Withdrawals & Bot Requests'].map((title, index) => (
-            <button className="video-row" type="button" key={title} onClick={() => window.alert('Video lessons will be connected when the official tutorial links are provided.')}>
-              <span className="play-button"><Play size={15} fill="currentColor" /></span><span>{title}</span><span className="video-duration">0{index + 4}:2{index} min</span><ArrowRight size={16} />
-            </button>
-          ))}
+      <section className="plans-section">
+        <div className="values-heading"><p className="eyebrow">CHOOSE YOUR LAUNCH</p><h2>Two ways to go live</h2></div>
+        <div className="plans-grid">
+          <article className="feature-card">
+            <div className="feature-card-top"><span className="icon-box"><Rocket /></span><span className="feature-index">75%</span></div>
+            <p className="feature-tag">START HERE</p><h2>Free address</h2>
+            <p>Live instantly at yourname.executiveprimemarkets.site. Full branding and the complete toolset, with customer support handled by EPM. You keep 75% of commission; EPM keeps 25%.</p>
+          </article>
+          <article className="feature-card">
+            <div className="feature-card-top"><span className="icon-box"><Globe2 /></span><span className="feature-index">85%</span></div>
+            <p className="feature-tag">FULL OWNERSHIP</p><h2>Your own domain</h2>
+            <p>Run on your own address, with your own WhatsApp, phone and email for client support. Reviewed and activated by our team. You keep 85% of commission; EPM keeps 15%.</p>
+          </article>
         </div>
       </section>
-      <CtaStrip title="Your platform starts with one step." />
+      <CtaStrip title="Your platform is one sign-up away." />
     </PageWrap>
   );
 }
 
 const features = [
-  { icon: <Palette />, title: 'Custom Branding', text: 'Full white-label: your logo, your colors, your domain. Every site is uniquely yours.', tag: 'YOUR BRAND' },
-  { icon: <Bot />, title: 'Bot Builder', text: 'Drag-and-drop trading bot creation with stop loss, take profit, and advanced trade logic.', tag: 'BUILD STRATEGIES' },
-  { icon: <BarChart3 />, title: 'Analysis Tools', text: 'Advanced market analysis with real-time signals, multiple indicators, and pattern detection.', tag: 'MARKET INSIGHTS' },
-  { icon: <Blocks />, title: 'Free Bots Library', text: 'Ready-made trading strategies your users can browse and deploy instantly, no setup needed.', tag: 'START FASTER' },
-  { icon: <Wallet />, title: 'Commission Tracking', text: 'Real-time dashboard showing your earnings from Deriv markup. Track every cent.', tag: 'CLEAR REPORTING' },
-  { icon: <Globe2 />, title: 'Custom Domain', text: 'Connect your own domain or purchase one through the platform. Full DNS management included.', tag: 'YOUR ADDRESS' },
+  { icon: <Palette />, title: 'Complete branding', text: 'Your name, logo, colours and typeface across the whole platform, with your own About, Vision and Mission pages.', tag: 'YOUR BRAND' },
+  { icon: <Bot />, title: 'Visual bot builder', text: 'A drag-and-drop builder for Deriv trading bots, with stop-loss, take-profit and flexible trade logic.', tag: 'BUILD STRATEGIES' },
+  { icon: <BarChart3 />, title: 'Market analysis', text: 'An analysis tool that tracks live market data and digit statistics so clients can study conditions before they trade. It informs decisions; it does not predict outcomes.', tag: 'MARKET INSIGHTS' },
+  { icon: <Blocks />, title: 'Strategy library', text: 'A growing library of ready-made bots your clients can browse and load in a click, managed centrally by EPM.', tag: 'START FASTER' },
+  { icon: <Wallet />, title: 'Transparent commission', text: 'A fixed split agreed in advance: 75% to you on a free address, 85% on your own domain, paid out monthly.', tag: 'CLEAR TERMS' },
+  { icon: <Globe2 />, title: 'Your own domain', text: 'Move to your own address whenever you are ready. We tell you the exact DNS record to add and activate the site after review.', tag: 'YOUR ADDRESS' },
 ];
 
 function FeaturesPage() {
   return (
-    <PageWrap eyebrow="CAPABILITIES" title="Everything You Need" intro="A complete toolkit for building, branding, and monetizing your own trading platform." className="features-page">
+    <PageWrap eyebrow="CAPABILITIES" title="Everything you need to launch" intro="A complete toolkit for branding, launching and running your own Deriv-powered trading platform." className="features-page">
       <div className="features-grid">
         {features.map((feature, index) => (
           <article className="feature-card" key={feature.title}>
@@ -463,34 +474,35 @@ function FeaturesPage() {
           </article>
         ))}
       </div>
-      <CtaStrip title="See what your own platform could look like." />
+      <CtaStrip title="Launch your own branded platform today." />
     </PageWrap>
   );
 }
 
 function AboutPage() {
   return (
-    <PageWrap eyebrow="ABOUT EPM" title="Building the future of trading." intro="High-performance trading infrastructure, designed for clarity, choice, and a better experience for platform owners." className="about-page">
+    <PageWrap eyebrow="ABOUT EPM" title="Trading technology, packaged for platform owners." intro="Executive Prime Markets gives entrepreneurs and communities a ready-built way to run their own Deriv-powered trading platform." className="about-page">
       <section className="mission-layout">
-        <div className="mission-copy"><span className="icon-box"><Rocket /></span><p className="eyebrow">OUR MISSION</p><h2>Make platform ownership more accessible.</h2><p>At Executive Prime Markets (EPM), we believe that anyone should be able to build and grow a trading platform. Our mission is to make access to Deriv's trading infrastructure more approachable through a white-label platform.</p><p>Bring your brand to life with site configuration, bot-building tools, market analysis, commission reporting, and custom-domain options—so you can spend more time building your community.</p></div>
-        <div className="mission-stat"><span className="icon-box"><Users /></span><b>250K+</b><span>Active traders empowered</span><div className="stat-progress"><i /></div><small>Network growth</small></div>
+        <div className="mission-copy"><span className="icon-box"><Rocket /></span><p className="eyebrow">OUR MISSION</p><h2>Make owning a trading platform straightforward.</h2><p>Building trading software from scratch takes a team and a budget. EPM removes that barrier: you launch under your own brand on infrastructure that already works, and focus on serving your clients.</p><p>Branding controls, a visual bot builder, market analysis tools, a strategy library and transparent commission terms are all part of the platform.</p></div>
+        <div className="mission-stat"><span className="icon-box"><Users /></span><b>85%</b><span>Your share on your own domain</span><div className="stat-progress"><i /></div><small>Commission split</small></div>
       </section>
-      <div className="values-heading"><p className="eyebrow">CORE PRINCIPLES</p><h2>The Values That Drive Us</h2></div>
+      <div className="values-heading"><p className="eyebrow">OUR PRINCIPLES</p><h2>The principles we work by</h2></div>
       <div className="values-grid">
-        <ValueCard icon={<ShieldCheck />} title="Transparency" detail="Clear commission structures, earnings visibility, and open system status. Know where your business stands." />
-        <ValueCard icon={<Sparkles />} title="Innovation" detail="We keep improving white-label trading technology to bring useful tools and capabilities to platform owners." />
-        <ValueCard icon={<Users />} title="Community" detail="A strong network amplifies individual success. Share insights, learn from others, and grow together." />
+        <ValueCard icon={<ShieldCheck />} title="Transparency" detail="Commission rates are agreed up front and stated plainly, so you always know how your share is calculated." />
+        <ValueCard icon={<Sparkles />} title="Continuous improvement" detail="We keep refining the platform and adding tools that make running a trading brand easier." />
+        <ValueCard icon={<Users />} title="Support" detail="Clients of free sites are supported directly by EPM, and own-domain owners are guided through setup." />
       </div>
-      <CtaStrip title="Build something that feels like yours." />
+      <CtaStrip title="Build a trading brand of your own." />
     </PageWrap>
   );
 }
 
 const faqs = [
-  { question: 'What is the commission split?', answer: 'The total commission generated for eligible activity is treated as a 100% pool. In the current example, EPM receives 15% of that pool and the site owner receives 85%. For a $10 commission pool, that is $1.50 for EPM and $8.50 for the site owner. Final rates and eligibility rules depend on the applicable agreements.' },
-  { question: 'How do I get paid?', answer: 'Your share accrues from eligible activity during the month. After the monthly partner payment is received and reconciled by EPM, EPM pays the site owner’s agreed share. Payout methods and timing depend on the final agreement.' },
-  { question: 'How long does deployment take?', answer: 'The setup flow guides you through brand, site, and domain settings. Actual deployment depends on domain configuration and connected services.' },
-  { question: 'Can I use my own domain?', answer: 'Yes. The platform concept supports connecting a domain you own, or purchasing one through the platform.' },
+  { question: 'How is commission shared?', answer: 'Commission earned on your clients’ eligible trading activity is split between EPM and you. On a free address, EPM keeps 25% and you receive 75%. On your own domain, EPM keeps 15% and you receive 85%. For example, on a $10 commission pool with your own domain, that is $8.50 for you and $1.50 for EPM. Final terms are set out in your agreement.' },
+  { question: 'When and how do I get paid?', answer: 'Commission accrues through the month. After Deriv’s monthly partner payment is received and reconciled by EPM, your share is paid out. Payout methods and timing are confirmed in your agreement.' },
+  { question: 'How long does it take to launch?', answer: 'A free address goes live the moment you create it. An own-domain site is reviewed and activated by our team once the DNS record for your domain is in place.' },
+  { question: 'Can I use my own domain?', answer: 'Yes. Choose your own domain when you sign up, or request it later from your dashboard. We will tell you exactly which DNS record to add.' },
+  { question: 'Is trading risky?', answer: 'Yes. Trading on Deriv, including synthetic indices and digital options, carries a high risk of loss, and past results do not predict future ones. Commission depends on client trading activity and is not guaranteed.' },
 ];
 
 function ContactPage() {
@@ -499,22 +511,26 @@ function ContactPage() {
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const name = String(form.get('name') ?? '').trim();
+    const message = String(form.get('message') ?? '').trim();
+    const text = `Hello EPM, my name is ${name}. ${message}`;
+    window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(text)}`, '_blank', 'noopener,noreferrer');
     setSent(true);
   }
 
   return (
-    <PageWrap eyebrow="SUPPORT" title="Get in Touch" intro="Have questions? We're here to help. Send us a message and we'll be in touch." className="contact-page">
+    <PageWrap eyebrow="SUPPORT" title="Get in touch" intro="Questions before you start? Message our team and we will reply as soon as we can." className="contact-page">
       <div className="contact-layout">
         <form className="contact-form panel" onSubmit={submit}>
           <h2>Send us a message</h2>
-          {sent && <div className="inline-success"><Check size={16} /> Demo message validated. Connect an email service to deliver it.</div>}
+          {sent && <div className="inline-success"><Check size={16} /> Opening WhatsApp with your message.</div>}
           <label>Your name<input required name="name" autoComplete="name" placeholder="Your full name" /></label>
-          <label>Email address<input required name="email" type="email" autoComplete="email" placeholder="you@example.com" /></label>
           <label>Message<textarea required name="message" rows={5} placeholder="How can we help?" /></label>
-          <button className="button button-gradient button-full" type="submit">Send message <ArrowRight size={16} /></button>
+          <button className="button button-gradient button-full" type="submit">Message us on WhatsApp <ArrowRight size={16} /></button>
         </form>
         <div className="contact-side">
-          <article className="whatsapp-card"><span className="icon-box"><LifeBuoy /></span><p className="eyebrow">DIRECT SUPPORT</p><h2>Prefer a quick chat?</h2><p>Our support team is available on WhatsApp.</p><strong>+254 705 491 022</strong><a href="https://wa.me/254705491022" target="_blank" rel="noreferrer">Open WhatsApp <ArrowUpRight size={15} /></a></article>
+          <article className="whatsapp-card"><span className="icon-box"><LifeBuoy /></span><p className="eyebrow">DIRECT SUPPORT</p><h2>Prefer a quick chat?</h2><p>Our team is available on WhatsApp.</p><strong>+254 705 491 022</strong><a href={`https://wa.me/${WHATSAPP_NUMBER}`} target="_blank" rel="noreferrer">Open WhatsApp <ArrowUpRight size={15} /></a></article>
           <section className="faq-panel"><p className="eyebrow">FAQ</p><h2>Common questions</h2>{faqs.map((faq, index) => <div className={`faq-item${openFaq === index ? ' faq-open' : ''}`} key={faq.question}><button type="button" onClick={() => setOpenFaq(openFaq === index ? null : index)}>{faq.question}<ChevronDown size={17} /></button>{openFaq === index && <p>{faq.answer}</p>}</div>)}</section>
         </div>
       </div>
@@ -525,21 +541,14 @@ function ContactPage() {
 function LegalPage({ kind }: { kind: 'privacy' | 'terms' }) {
   const title = kind === 'privacy' ? 'Privacy Policy' : 'Terms of Service';
   return (
-    <PageWrap
-      eyebrow="LEGAL"
-      title={title}
-      intro="This prototype does not yet include production legal documents."
-      className="legal-page"
-    >
+    <PageWrap eyebrow="LEGAL" title={title} intro="Our full legal documents are being finalised." className="legal-page">
       <section className="panel legal-notice">
         <span className="icon-box"><ShieldCheck /></span>
-        <h2>Documentation required before launch</h2>
+        <h2>Publication in progress</h2>
         <p>
-          Before accepting real users, publish reviewed privacy and service
-          terms that explain how account data, trading activity, referrals, and
-          commission settlements are handled. This preview stores demo profile
-          and site-draft data in this browser only and does not create a live
-          account.
+          The Privacy Policy and Terms of Service will cover how account data,
+          trading activity, referrals and commission settlements are handled.
+          If you have questions in the meantime, please contact the team.
         </p>
         <Link className="text-action" to="/contact">
           Contact the team <ArrowRight size={15} />
@@ -898,11 +907,25 @@ function SupportPageForDemo() {
 }
 
 function CtaStrip({ title }: { title: string }) {
-  return <section className="cta-strip"><div><p className="eyebrow"><span /> START BUILDING</p><h2>{title}</h2></div><Link className="button button-gradient button-large" to="/signup">Create your platform <ArrowRight size={17} /></Link></section>;
+  return <section className="cta-strip"><div><p className="eyebrow"><span /> GET STARTED</p><h2>{title}</h2></div><a className="button button-gradient button-large" href={OWNER_URL}>Create your platform <ArrowRight size={17} /></a></section>;
 }
 
 function Footer() {
-  return <footer className="site-footer"><div className="footer-top"><div className="footer-brand-block"><Link to="/" className="brand"><span className="brand-mark"><CircleDollarSign size={23} strokeWidth={2.2} /></span><span>EPM</span></Link><p>Executive Prime Markets helps traders and platform owners access powerful, accessible trading tools. Every trader, every opportunity.</p></div><div className="footer-col"><b>Product</b><Link to="/features">Features</Link><Link to="/how-it-works">How it works</Link></div><div className="footer-col"><b>Company</b><Link to="/about">About</Link><Link to="/contact">Contact</Link></div><div className="footer-col"><b>Legal</b><Link to="/privacy">Privacy</Link><Link to="/terms">Terms</Link></div></div><div className="footer-bottom"><span>© 2026 EPM (Executive Prime Markets). All rights reserved.</span><span>Built for every trader, every opportunity.</span></div></footer>;
+  return (
+    <footer className="site-footer">
+      <div className="footer-top">
+        <div className="footer-brand-block">
+          <Link to="/" className="brand"><span className="brand-mark"><CircleDollarSign size={23} strokeWidth={2.2} /></span><span>EPM</span></Link>
+          <p>Executive Prime Markets provides white-label tools for running your own Deriv-powered trading platform.</p>
+        </div>
+        <div className="footer-col"><b>Product</b><Link to="/features">Features</Link><Link to="/how-it-works">How it works</Link></div>
+        <div className="footer-col"><b>Company</b><Link to="/about">About</Link><Link to="/contact">Contact</Link></div>
+        <div className="footer-col"><b>Legal</b><Link to="/privacy">Privacy</Link><Link to="/terms">Terms</Link></div>
+      </div>
+      <p className="footer-risk">Risk warning: trading on Deriv, including synthetic indices and digital options, carries a high risk of loss and is not suitable for everyone. Commission depends on client trading activity and is not guaranteed.</p>
+      <div className="footer-bottom"><span>© 2026 EPM (Executive Prime Markets). All rights reserved.</span><span>Independent platform provider using Deriv’s trading services.</span></div>
+    </footer>
+  );
 }
 
 function NotFound() {

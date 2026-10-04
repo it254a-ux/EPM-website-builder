@@ -11,14 +11,14 @@ export default defineConfig({
         tag: 'link',
         attrs: {
           rel: 'stylesheet',
-          href: 'https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700;800&family=Manrope:wght@500;600;700;800&display=swap',
+          href: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@500;600;700&display=swap',
         },
       },
     ],
     title: 'EPM — Executive Prime Markets',
     meta: {
       description:
-        'Build, brand, and grow your own trading platform with EPM.',
+        'Launch your own branded, Deriv-powered trading platform with EPM. Free to start, no coding required.',
     },
   },
 });
