@@ -278,7 +278,7 @@ function PageWrap({
   );
 }
 
-const OWNER_URL = 'https://executiveprimemarkets.site/owner';
+const OWNER_URL = '/app/'; // sign-up, sign-in and the dashboard live on this same site
 const WHATSAPP_NUMBER = '254115533208';
 
 function ExternalRedirect({ to }: { to: string }) {

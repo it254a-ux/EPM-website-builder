@@ -2,7 +2,6 @@
   "name": "epm-platform-prototype",
   "version": "0.1.0",
   "private": true,
-  "type": "module",
   "description": "A standalone EPM (Executive Prime Markets) platform prototype.",
   "scripts": {
     "dev": "rsbuild dev --port 4003",
@@ -10,6 +9,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@neondatabase/serverless": "^1.2.0",
     "lucide-react": "^0.468.0",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
