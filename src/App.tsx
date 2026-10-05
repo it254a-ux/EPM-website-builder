@@ -279,7 +279,7 @@ function PageWrap({
 }
 
 const OWNER_URL = 'https://executiveprimemarkets.site/owner';
-const WHATSAPP_NUMBER = '254705491022';
+const WHATSAPP_NUMBER = '254115533208';
 
 function ExternalRedirect({ to }: { to: string }) {
   useEffect(() => {
@@ -530,7 +530,7 @@ function ContactPage() {
           <button className="button button-gradient button-full" type="submit">Message us on WhatsApp <ArrowRight size={16} /></button>
         </form>
         <div className="contact-side">
-          <article className="whatsapp-card"><span className="icon-box"><LifeBuoy /></span><p className="eyebrow">DIRECT SUPPORT</p><h2>Prefer a quick chat?</h2><p>Our team is available on WhatsApp.</p><strong>+254 705 491 022</strong><a href={`https://wa.me/${WHATSAPP_NUMBER}`} target="_blank" rel="noreferrer">Open WhatsApp <ArrowUpRight size={15} /></a></article>
+          <article className="whatsapp-card"><span className="icon-box"><LifeBuoy /></span><p className="eyebrow">DIRECT SUPPORT</p><h2>Prefer a quick chat?</h2><p>Our team is available on WhatsApp.</p><strong>+254 115 533 208</strong><a href={`https://wa.me/${WHATSAPP_NUMBER}`} target="_blank" rel="noreferrer">Open WhatsApp <ArrowUpRight size={15} /></a></article>
           <section className="faq-panel"><p className="eyebrow">FAQ</p><h2>Common questions</h2>{faqs.map((faq, index) => <div className={`faq-item${openFaq === index ? ' faq-open' : ''}`} key={faq.question}><button type="button" onClick={() => setOpenFaq(openFaq === index ? null : index)}>{faq.question}<ChevronDown size={17} /></button>{openFaq === index && <p>{faq.answer}</p>}</div>)}</section>
         </div>
       </div>
@@ -538,22 +538,172 @@ function ContactPage() {
   );
 }
 
+type LegalSection = { title: string; paragraphs?: string[]; bullets?: string[] };
+
+const LEGAL_UPDATED = '4 October 2026';
+
+const termsSections: LegalSection[] = [
+  { title: 'About these terms', paragraphs: [
+    'These Terms of Service ("Terms") are an agreement between you ("Site Owner", "you") and Executive Prime Markets ("EPM", "we", "us"). They govern your use of the EPM platform, which lets you run a branded trading website powered by Deriv’s trading services (the "Platform").',
+    'By creating an account or launching a site you confirm that you have read and accepted these Terms. If you do not agree, please do not use the Platform.',
+  ] },
+  { title: 'Who we are and what we are not', paragraphs: [
+    'EPM is an independent software provider. We are not Deriv, we are not owned by, affiliated with or endorsed by Deriv, and we are not a broker, exchange, bank or fund manager.',
+    'Trades placed through a Platform site are executed by Deriv on the trader’s own Deriv account. EPM does not hold, custody or have access to traders’ funds, and does not give financial, investment or trading advice. Each trader’s Deriv account is governed by Deriv’s own terms.',
+  ] },
+  { title: 'Eligibility and your account', bullets: [
+    'You must be at least 18 years old and legally able to enter into this agreement.',
+    'You must give accurate information and keep it up to date.',
+    'You are responsible for keeping your password secure and for everything done under your account.',
+    'Each account may operate one site. We may decline, suspend or close an account where we reasonably believe these Terms are being breached or the account presents a risk.',
+  ] },
+  { title: 'Your site and the two plans', paragraphs: [
+    'You can launch a site on one of two plans.',
+  ], bullets: [
+    'Free address: your site goes live immediately at a subdomain of our domain. You get full branding and the complete toolset. Customer support for your clients is provided by EPM, and your site may display a "powered by" notice and EPM promotions.',
+    'Your own domain: your site runs on a domain you own. After you add the DNS record we specify, we review and activate it. You provide your own client support contacts.',
+    'You must own, or be authorised to use, any domain you connect. We may deactivate a site whose domain no longer points to the Platform or which you no longer control.',
+    'You may request to move from a free address to your own domain from your dashboard. The change takes effect when we approve it.',
+  ] },
+  { title: 'Commission and how it is shared', paragraphs: [
+    'The Platform earns commission from Deriv on eligible trading activity carried out through your site. We share that commission with you as follows, unless we agree a different rate with you in writing:',
+  ], bullets: [
+    'Free address: you receive 75% and EPM keeps 25%.',
+    'Your own domain: you receive 85% and EPM keeps 15%.',
+    'Your current rate is shown in your dashboard. If you move to your own domain, the new rate applies only from the date the change takes effect; earlier activity stays at the earlier rate.',
+    'We may change the standard rates for future activity by giving you reasonable notice.',
+    'Commission depends on Deriv’s reports and payments and on your clients’ trading activity. We do not guarantee that any commission will be earned. Where Deriv adjusts, reverses or withholds commission, we may adjust your share to match.',
+  ] },
+  { title: 'Payment', bullets: [
+    'Commission accrues through each month. After Deriv’s monthly partner payment has been received and reconciled by EPM, we pay your share using the payout method you have given us.',
+    'You are responsible for any taxes on the amounts you receive. We may deduct bank or transfer charges that apply to your payout.',
+    'We may withhold or recover amounts that relate to reversed or disputed commission, suspected fraud, or a breach of these Terms.',
+    'Amounts are paid without interest. Payout details and timing are confirmed with you before your first payout.',
+  ] },
+  { title: 'What you must and must not do', paragraphs: [
+    'You are responsible for your site, your marketing and your dealings with your clients. You agree to:',
+  ], bullets: [
+    'comply with all laws that apply to you and to your promotion of trading services, including advertising and financial-promotion rules in the places you operate;',
+    'never promise or imply guaranteed profits, risk-free trading or a fixed income, and always make clear that trading carries a high risk of loss;',
+    'not suggest that Deriv or EPM endorses you, and not impersonate either of us;',
+    'not target people under 18, or people in places where Deriv’s services are not available or are restricted;',
+    'not publish content that is unlawful, misleading, defamatory or that infringes someone else’s rights;',
+    'not attempt to access other users’ data, bypass our security, overload the Platform, or copy or resell the Platform or its bot library.',
+  ] },
+  { title: 'Intellectual property', paragraphs: [
+    'The Platform, its software, the bot library and our branding belong to EPM or its licensors. While your account is active, we give you a limited, non-exclusive, revocable right to use them to run your site.',
+    'Your logo, text and other content remain yours. You give us permission to host, display and distribute that content as needed to operate your site.',
+  ] },
+  { title: 'Third parties and availability', paragraphs: [
+    'The Platform relies on third-party services, including Deriv and our hosting and database providers. We do not control them and are not responsible for their outages, changes or decisions.',
+    'We work to keep the Platform available, but we provide it "as is" and do not promise uninterrupted or error-free service. We may carry out maintenance and make changes to the Platform at any time.',
+  ] },
+  { title: 'Suspension and termination', bullets: [
+    'You can stop using the Platform and ask us to close your account at any time.',
+    'We may suspend or end your access immediately if you breach these Terms, if we reasonably suspect fraud or unlawful activity, if Deriv requires it, or if we are required to by law.',
+    'When a site is suspended or closed it goes offline. Commission already earned remains payable under these Terms, except where we are entitled to withhold it.',
+  ] },
+  { title: 'Disclaimers and limits of liability', paragraphs: [
+    'Trading, including on synthetic indices and digital options, carries a high risk of loss. Nothing on the Platform is financial advice, and past results do not predict future results. We are not responsible for any trading losses suffered by you or your clients.',
+    'To the fullest extent the law allows, we are not liable for indirect or consequential loss, loss of profit or loss of business. Our total liability to you under these Terms is limited to the commission payable to you in the 12 months before the event giving rise to the claim. Nothing in these Terms limits liability that cannot lawfully be limited.',
+  ] },
+  { title: 'Indemnity', paragraphs: [
+    'You agree to compensate EPM for losses, claims and reasonable costs that arise from your content, your marketing, your dealings with your clients, or your breach of these Terms.',
+  ] },
+  { title: 'Changes to these terms', paragraphs: [
+    'We may update these Terms. We will tell you about important changes through your dashboard or by contacting you. If you keep using the Platform after a change takes effect, you accept the updated Terms.',
+  ] },
+  { title: 'Governing law', paragraphs: [
+    'These Terms are governed by the laws of Kenya, and the courts of Kenya have jurisdiction over any dispute, unless the law where you live gives you rights that cannot be limited.',
+  ] },
+  { title: 'Contact', paragraphs: [
+    'Questions about these Terms? Message us on WhatsApp at +254 115 533 208.',
+  ] },
+];
+
+const privacySections: LegalSection[] = [
+  { title: 'Who this policy covers', paragraphs: [
+    'This Privacy Policy explains how Executive Prime Markets ("EPM", "we", "us") handles personal information when you use this website and the EPM platform as a site owner or visitor.',
+    'It does not cover Deriv. When you or your clients sign in with Deriv, Deriv handles that sign-in under its own privacy policy.',
+  ] },
+  { title: 'Information we collect', paragraphs: [
+    'We collect only what we need to run the Platform:',
+  ], bullets: [
+    'Account details: your name, email address and a securely hashed version of your password. We never store your password in readable form.',
+    'Site details: your site name, logo link, colours, font, About, Vision and Mission text, your domain, and any support contacts you choose to publish.',
+    'Payout details: the information you give us so that we can pay your commission.',
+    'Technical data: your IP address and basic request information, used to keep the service secure and to limit repeated login attempts.',
+    'Messages: anything you send us, for example through WhatsApp.',
+    'Commission records: reports we receive from Deriv about commission earned through the Platform. These may include account identifiers and amounts, and are used only to calculate and pay commission.',
+  ] },
+  { title: 'What we do not collect', paragraphs: [
+    'We do not hold or have access to anyone’s trading funds, and we never see or store a trader’s Deriv password. Sign-in with Deriv takes place on Deriv’s own pages. Trading instructions go from the trader’s browser directly to Deriv.',
+  ] },
+  { title: 'How we use information', bullets: [
+    'to create and run your account and your site;',
+    'to calculate and pay commission;',
+    'to provide support and respond to your messages;',
+    'to keep the Platform secure and prevent fraud and abuse;',
+    'to meet legal and regulatory obligations;',
+    'to tell you about important changes to the service.',
+  ] },
+  { title: 'Cookies and similar technology', paragraphs: [
+    'When you sign in we set one essential session cookie to keep you signed in. It is protected from scripts on the page and is removed when you sign out. We do not use advertising cookies on your account pages.',
+  ] },
+  { title: 'Who we share information with', paragraphs: [
+    'We do not sell personal information. We share it only with:',
+  ], bullets: [
+    'service providers that host and run the Platform, such as our hosting and database providers, who process it on our behalf;',
+    'Deriv, to the extent needed to operate the Platform and report commission;',
+    'authorities or professional advisers where the law requires it or where needed to protect our rights.',
+  ] },
+  { title: 'Where information is processed', paragraphs: [
+    'Our providers may process information in countries outside Kenya. Where that happens we take steps to keep it protected in line with applicable data protection law.',
+  ] },
+  { title: 'How long we keep it', paragraphs: [
+    'We keep account and site information while your account is open. After you close your account we delete or anonymise it, except where we must keep records, for example for tax, accounting, fraud prevention or legal reasons.',
+  ] },
+  { title: 'Security', paragraphs: [
+    'Passwords are hashed, sessions expire, login attempts are limited, and access to administration is restricted. No system is completely secure, so please use a strong, unique password and tell us promptly if you suspect misuse of your account.',
+  ] },
+  { title: 'Your rights', paragraphs: [
+    'Under applicable data protection law, including Kenya’s Data Protection Act, 2019, you may ask to access, correct or delete your personal information, object to certain uses, or ask for a copy of it. Message us at +254 115 533 208 and we will respond within a reasonable time. You may also complain to the Office of the Data Protection Commissioner.',
+  ] },
+  { title: 'Children', paragraphs: [
+    'The Platform is for people aged 18 and over. We do not knowingly collect information from anyone under 18.',
+  ] },
+  { title: 'Changes to this policy', paragraphs: [
+    'We may update this policy from time to time. The date at the top shows when it was last changed, and we will notify you of significant changes.',
+  ] },
+  { title: 'Contact', paragraphs: [
+    'For privacy questions or requests, message us on WhatsApp at +254 115 533 208.',
+  ] },
+];
+
 function LegalPage({ kind }: { kind: 'privacy' | 'terms' }) {
-  const title = kind === 'privacy' ? 'Privacy Policy' : 'Terms of Service';
+  const isPrivacy = kind === 'privacy';
+  const sections = isPrivacy ? privacySections : termsSections;
   return (
-    <PageWrap eyebrow="LEGAL" title={title} intro="Our full legal documents are being finalised." className="legal-page">
-      <section className="panel legal-notice">
-        <span className="icon-box"><ShieldCheck /></span>
-        <h2>Publication in progress</h2>
-        <p>
-          The Privacy Policy and Terms of Service will cover how account data,
-          trading activity, referrals and commission settlements are handled.
-          If you have questions in the meantime, please contact the team.
-        </p>
-        <Link className="text-action" to="/contact">
-          Contact the team <ArrowRight size={15} />
-        </Link>
-      </section>
+    <PageWrap
+      eyebrow="LEGAL"
+      title={isPrivacy ? 'Privacy Policy' : 'Terms of Service'}
+      intro={isPrivacy ? 'How we collect, use and protect your information.' : 'The agreement that governs your use of the EPM platform.'}
+      className="legal-page"
+    >
+      <article className="legal-doc">
+        <p className="legal-updated">Last updated: {LEGAL_UPDATED}</p>
+        {sections.map((section, index) => (
+          <section key={section.title}>
+            <h2><span>{String(index + 1).padStart(2, '0')}</span>{section.title}</h2>
+            {section.paragraphs?.map((text) => <p key={text}>{text}</p>)}
+            {section.bullets && <ul>{section.bullets.map((text) => <li key={text}>{text}</li>)}</ul>}
+          </section>
+        ))}
+        <div className="legal-foot">
+          <p>Trading carries a high risk of loss. Nothing on this website is financial advice.</p>
+          <Link className="text-action" to="/contact">Contact the team <ArrowRight size={15} /></Link>
+        </div>
+      </article>
     </PageWrap>
   );
 }
