@@ -6,7 +6,7 @@
     var WA = '254115533208', WA_SHOW = '+254 115 533 208';
     var FONTS = ['', 'Inter', 'Roboto', 'Poppins', 'DM Sans', 'Lato', 'Nunito', 'Open Sans', 'Montserrat', 'Raleway', 'Source Sans 3'];
     var root = document.getElementById('app');
-    var S = { owner: null, site: null, dns: { cname: 'cname.vercel-dns-0.com', a: '76.76.21.21' }, events: [] };
+    var S = { owner: null, site: null, freeRoot: '', dns: { cname: 'cname.vercel-dns-0.com', a: '76.76.21.21' }, events: [] };
     var installEvent = null, viewEl = null, sideEl = null, scrimEl = null, whoEl = null;
 
     /* ---------- helpers ---------- */
@@ -222,7 +222,7 @@
         if (creating && site) { return el('div', {}, [head('Sites', 'Create a site'), el('div', { class: 'card' }, [el('p', { text: 'You already have a site. Each account has one site.' }), el('a', { class: 'btn', href: '#/sites', text: 'Back to sites' })])]); }
         if (!creating && !site) { return el('div', {}, [head('Sites', 'Edit site'), el('div', { class: 'card' }, [el('p', { text: 'Create your site first.' }), el('a', { class: 'btn primary', href: '#/sites/new', text: 'Create site' })])]); }
         var v = el('div'), fields = {}, isCustom = site ? site.plan === 'custom' : false;
-        var root_ = location.hostname.split('.').slice(-2).join('.');
+        var root_ = S.freeRoot || 'your-domain';
         v.appendChild(head('Sites', creating ? 'Create a new site' : 'Edit ' + site.name));
 
         var contactBox;
@@ -410,7 +410,7 @@
     function loadSite() {
         return api('/api/my-site').then(function (s) {
             if (s.__status === 401) return;
-            S.site = s.site || null; S.events = s.events || []; if (s.dns) S.dns = s.dns;
+            S.site = s.site || null; S.events = s.events || []; if (s.dns) S.dns = s.dns; if (typeof s.free_root === 'string') S.freeRoot = s.free_root;
         });
     }
     function boot() {

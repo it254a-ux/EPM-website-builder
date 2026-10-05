@@ -69,6 +69,7 @@ module.exports = async function handler(req, res) {
             return send(res, 200, {
                 site: row ? view(row) : null,
                 dns: { cname: process.env.DNS_CNAME_TARGET || 'cname.vercel-dns-0.com', a: process.env.DNS_A_TARGET || '76.76.21.21' },
+                free_root: S.normalizeHost(process.env.PLATFORM_ROOT_DOMAIN) || '',
                 events: row ? await listEvents(sql, row.id) : [],
             });
         }
