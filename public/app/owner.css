@@ -70,3 +70,6 @@ details{border-bottom:1px solid var(--line);padding:12px 0}details:last-child{bo
 .btn.google:hover{border-color:#bdc1c6;background:#f8f9fa}
 .divider{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:.8rem;margin:16px 0 2px}
 .divider:before,.divider:after{content:"";flex:1;height:1px;background:var(--line)}
+
+.linkbtn{display:block;width:100%;margin-top:10px;background:none;border:0;color:var(--muted);font:inherit;font-size:.88rem;text-decoration:underline;cursor:pointer;text-align:center}
+.linkbtn:hover{color:inherit}

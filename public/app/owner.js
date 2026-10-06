@@ -105,7 +105,15 @@
             'I agree to the ', el('a', { href: MARKETING + '/privacy', target: '_blank', rel: 'noopener', text: 'Privacy Policy' }), ' and ',
             el('a', { href: MARKETING + '/terms', target: '_blank', rel: 'noopener', text: 'Terms of Service' })])]);
 
+        var showForm = !S.google, gBtn = null;
+        var emailToggle = el('button', { type: 'button', class: 'linkbtn', text: 'Sign up with email instead' });
+        emailToggle.addEventListener('click', function () { showForm = true; sync(); });
+        var formWrap = el('div', {}, [name.wrap, email.wrap, pw.wrap, pw2.wrap]);
         function sync() {
+            var collapsed = registering && !!S.google && !showForm;
+            formWrap.classList.toggle('hidden', collapsed); btn.classList.toggle('hidden', collapsed);
+            emailToggle.classList.toggle('hidden', !(registering && !!S.google && !showForm));
+            if (gBtn) gBtn.lastChild.textContent = registering ? 'Sign up with Google' : 'Continue with Google';
             title.textContent = registering ? 'Create account' : 'Welcome back';
             sub.textContent = registering ? 'Sign up to get started' : 'Sign in to your dashboard';
             btn.textContent = registering ? 'Create account' : 'Sign in';
@@ -146,15 +154,15 @@
         ]);
         var googleBlock = null;
         if (S.google) {
-            var gBtn = el('button', { type: 'button', class: 'btn google' }, [googleIcon(), el('span', { text: 'Continue with Google' })]);
+            gBtn = el('button', { type: 'button', class: 'btn google' }, [googleIcon(), el('span', { text: 'Continue with Google' })]);
             gBtn.addEventListener('click', function () {
                 termsErr.textContent = '';
                 if (registering && !terms.checked) { termsErr.textContent = 'Please accept the Privacy Policy and Terms of Service first.'; return; }
                 location.href = '/api/google?start=1&terms=' + (registering && terms.checked ? '1' : '0');
             });
-            googleBlock = el('div', {}, [el('div', { style: 'margin-top:14px' }, [gBtn]), el('div', { class: 'divider', text: 'or' })]);
+            googleBlock = el('div', {}, [el('div', { style: 'margin-top:14px' }, [gBtn]), el('div', { class: 'divider', text: 'or' }), emailToggle]);
         }
-        var card = el('div', { class: 'card auth-card' }, [title, sub, googleBlock, name.wrap, email.wrap, pw.wrap, pw2.wrap, termsRow, termsErr, msg, btn, sw]);
+        var card = el('div', { class: 'card auth-card' }, [title, sub, termsRow, termsErr, googleBlock, formWrap, msg, btn, sw]);
         root.appendChild(el('div', { class: 'auth' }, [promo, card]));
         sync();
         if (notice) msg.textContent = notice;
@@ -450,7 +458,7 @@
                 S.owner = null;
                 var code = new URLSearchParams(location.search).get('google');
                 if (code) history.replaceState(null, '', location.pathname + location.hash);
-                return authView(code === 'terms', code ? (GOOGLE_MESSAGES[code] || GOOGLE_MESSAGES.error) : '');
+                return authView(code !== 'disabled' && code !== 'admin', code ? (GOOGLE_MESSAGES[code] || GOOGLE_MESSAGES.error) : '');
             }
             S.owner = r.owner;
             if (r.owner.role === 'admin') {
