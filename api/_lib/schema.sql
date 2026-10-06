@@ -81,3 +81,9 @@ CREATE TABLE IF NOT EXISTS site_events (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS site_events_site_idx ON site_events (site_id, id DESC);
+
+-- ===== Step 2 (wizard): per-site Deriv markup and App ID =====
+-- markup_percent: the markup % the operator chose for this site (0-3). The admin sets the same markup on that site's app in Deriv.
+-- app_id: the Deriv app the admin created for this site. NULL = still awaiting assignment.
+ALTER TABLE sites ADD COLUMN IF NOT EXISTS markup_percent NUMERIC(4,2) NOT NULL DEFAULT 1.00;
+ALTER TABLE sites ADD COLUMN IF NOT EXISTS app_id TEXT;

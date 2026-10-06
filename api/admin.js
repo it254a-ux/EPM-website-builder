@@ -21,7 +21,7 @@ const audit = (sql, adminId, action, target, detail) =>
 //   3. state-changing calls must come from the same site (no cross-site posts)
 //
 //   GET  /api/admin?resource=sites | owners | audit
-//   POST /api/admin  { action: set_status | update_site | approve_custom | set_rate | disable_owner | delete_site | delete_owner, ... }
+//   POST /api/admin  { action: set_status | update_site | approve_custom | set_app_id | set_markup | set_rate | disable_owner | delete_site | delete_owner, ... }
 module.exports = async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store');
     if (!A.onPlatformHost(req, 'strict')) return send(res, 404, { error: 'Not found' });
@@ -36,7 +36,7 @@ module.exports = async function handler(req, res) {
             const resource = String(req.query.resource || 'sites');
             if (resource === 'sites') {
                 const rows = await sql`
-                    SELECT s.id, s.domain, s.name, s.plan, s.status, s.custom_domain_requested, s.commission_rate_override,
+                    SELECT s.id, s.domain, s.name, s.plan, s.status, s.custom_domain_requested, s.commission_rate_override, s.markup_percent, s.app_id,
                            s.created_at, o.email AS owner_email, o.name AS owner_name
                     FROM sites s LEFT JOIN owners o ON o.id = s.owner_id
                     ORDER BY s.created_at DESC LIMIT 500
@@ -117,6 +117,30 @@ module.exports = async function handler(req, res) {
                 await sql`INSERT INTO site_rate_history (site_id, plan, platform_share) VALUES (${siteId}, 'custom', ${share})`;
                 await logEvent(sql, siteId, 'custom_domain_approved', { domain: site.custom_domain_requested });
                 await audit(sql, me.id, 'approve_custom', siteId, { from: site.domain, to: site.custom_domain_requested, platform_share: share });
+                return send(res, 200, { ok: true });
+            }
+
+            // The Deriv app you created for this site. Blank clears it (back to "awaiting").
+            case 'set_app_id': {
+                const site = await getSite();
+                if (!site) return send(res, 404, { error: 'Site not found.' });
+                const raw = String(body.app_id === undefined || body.app_id === null ? '' : body.app_id).trim();
+                const appId = raw === '' ? null : S.sanitizeAppId(raw);
+                if (raw !== '' && appId === null) return send(res, 400, { error: 'An App ID uses letters and numbers only.' });
+                await sql`UPDATE sites SET app_id = ${appId}, updated_at = now() WHERE id = ${siteId}`;
+                await audit(sql, me.id, 'set_app_id', siteId, { app_id: appId });
+                await logEvent(sql, siteId, appId ? 'app_id_assigned' : 'app_id_cleared', {});
+                return send(res, 200, { ok: true });
+            }
+
+            // Keep this equal to the markup you set on the site's Deriv app.
+            case 'set_markup': {
+                const site = await getSite();
+                if (!site) return send(res, 404, { error: 'Site not found.' });
+                const markup = S.sanitizeMarkup(body.markup_percent);
+                if (markup === null) return send(res, 400, { error: `Markup must be between 0 and ${S.MARKUP_MAX}%.` });
+                await sql`UPDATE sites SET markup_percent = ${markup}, updated_at = now() WHERE id = ${siteId}`;
+                await audit(sql, me.id, 'set_markup', siteId, { markup_percent: markup });
                 return send(res, 200, { ok: true });
             }
 

@@ -78,3 +78,9 @@ details{border-bottom:1px solid var(--line);padding:12px 0}details:last-child{bo
 .tab{background:none;border:0;border-radius:999px;padding:9px 16px;font:inherit;font-size:.88rem;font-weight:600;color:var(--muted);cursor:pointer}
 .tab:hover{color:inherit}.tab.on{background:var(--navy,#12284a);color:#fff}
 .card .row input[type=text]{flex:1;min-width:200px}
+
+.stepper{display:flex;align-items:center;gap:8px;max-width:260px}
+.stepper input{text-align:center;font-weight:700;font-size:1.05rem;width:100%}
+.stepper .pct{font-weight:700;color:var(--muted)}
+.stepbtn{flex:none;width:40px;height:40px;border-radius:50%;border:1px solid var(--line);background:#fff;font-size:1.3rem;line-height:1;cursor:pointer;color:var(--text)}
+.stepbtn:hover{border-color:var(--navy)}

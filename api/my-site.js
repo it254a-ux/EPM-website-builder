@@ -19,6 +19,9 @@ const view = row => ({
     about: row.about || '', vision: row.vision || '', mission: row.mission || '',
     whatsapp: row.whatsapp || '', phone: row.phone || '', support_email: row.support_email || '', telegram: row.telegram || '',
     custom_domain_requested: row.custom_domain_requested || '',
+    markup_percent: row.markup_percent === null || row.markup_percent === undefined ? S.MARKUP_DEFAULT : Number(row.markup_percent),
+    app_id: row.app_id || '',
+    app_status: row.app_id ? 'assigned' : 'awaiting',
     platform_share: effectiveShare(row),          // % the platform keeps
     operator_share: 100 - effectiveShare(row),    // % the operator receives
 });
@@ -26,7 +29,8 @@ const view = row => ({
 const findOwn = async (sql, ownerId) =>
     (await sql`
         SELECT id, domain, name, plan, status, primary_color, font, logo_url, about, vision, mission,
-               whatsapp, phone, support_email, telegram, custom_domain_requested, commission_rate_override
+               whatsapp, phone, support_email, telegram, custom_domain_requested, commission_rate_override,
+               markup_percent, app_id
         FROM sites WHERE owner_id = ${ownerId} LIMIT 1
     `)[0] || null;
 
@@ -103,6 +107,11 @@ module.exports = async function handler(req, res) {
                 if (!domain) errors.custom_domain = 'Enter a valid domain such as trade.yourbrand.com.';
                 else if (domainBlocked(domain)) errors.custom_domain = 'That domain cannot be used.';
             }
+            let markup = S.MARKUP_DEFAULT;
+            if (body.markup_percent !== undefined && String(body.markup_percent).trim() !== '') {
+                markup = S.sanitizeMarkup(body.markup_percent);
+                if (markup === null) errors.markup_percent = `Enter a markup between 0 and ${S.MARKUP_MAX}%.`;
+            }
             if (Object.keys(errors).length) return send(res, 400, { error: 'Please fix the highlighted fields.', fields: errors });
 
             const v = checked.value;
@@ -111,11 +120,11 @@ module.exports = async function handler(req, res) {
             try {
                 created = (await sql`
                     INSERT INTO sites (owner_id, domain, name, plan, status, primary_color, font, logo_url, about, vision, mission,
-                                       whatsapp, phone, support_email, telegram)
+                                       whatsapp, phone, support_email, telegram, markup_percent)
                     VALUES (${me.id}, ${domain}, ${v.name}, ${plan}, ${status}, ${n(v.primary_color)}, ${n(v.font)}, ${n(v.logo_url)},
                             ${n(v.about)}, ${n(v.vision)}, ${n(v.mission)},
                             ${plan === 'custom' ? n(v.whatsapp) : null}, ${plan === 'custom' ? n(v.phone) : null},
-                            ${plan === 'custom' ? n(v.support_email) : null}, ${plan === 'custom' ? n(v.telegram) : null})
+                            ${plan === 'custom' ? n(v.support_email) : null}, ${plan === 'custom' ? n(v.telegram) : null}, ${markup})
                     RETURNING id
                 `)[0];
             } catch (err) {
@@ -125,7 +134,7 @@ module.exports = async function handler(req, res) {
                 throw err;
             }
             await sql`INSERT INTO site_rate_history (site_id, plan, platform_share) VALUES (${created.id}, ${plan}, ${S.PLAN_SHARE[plan]})`;
-            await logEvent(sql, created.id, 'site_created', { plan, domain, status });
+            await logEvent(sql, created.id, 'site_created', { plan, domain, status, markup_percent: markup });
             return send(res, 201, { site: view(await findOwn(sql, me.id)) });
         }
 
@@ -145,7 +154,7 @@ module.exports = async function handler(req, res) {
             return send(res, 200, { site: view(await findOwn(sql, me.id)) });
         }
 
-        // Operators can edit ONLY these fields: never domain, plan, status or commission.
+        // Operators can edit ONLY these fields: never domain, plan, status, commission, markup or App ID.
         const checked = S.validateSiteInput(body, { ignoreContacts: row.plan === 'free' });
         if (!checked.ok) return send(res, 400, { error: 'Please fix the highlighted fields.', fields: checked.errors });
         const v = checked.value;

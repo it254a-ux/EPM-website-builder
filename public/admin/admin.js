@@ -46,14 +46,20 @@
             if (s.status !== 'suspended') btns.appendChild(el('button', { text: 'Suspend', onclick: function () { act({ action: 'set_status', site_id: s.id, status: 'suspended' }); } }));
             if (s.custom_domain_requested) btns.appendChild(el('button', { text: 'Approve ' + s.custom_domain_requested, onclick: function () {
                 if (confirm('Add ' + s.custom_domain_requested + ' to Vercel and your Deriv redirect list first. Switch the site now?')) act({ action: 'approve_custom', site_id: s.id }); } }));
+            btns.appendChild(el('button', { text: s.app_id ? 'Change App ID' : 'Assign App ID', onclick: function () {
+                var v = prompt('Deriv App ID for ' + s.name + ' (create the app in Deriv first, with ' + s.markup_percent + '% markup). Leave blank to clear.', s.app_id || '');
+                if (v === null) return; act({ action: 'set_app_id', site_id: s.id, app_id: v.trim() }); } }));
+            btns.appendChild(el('button', { text: 'Set markup', onclick: function () {
+                var v = prompt('Markup % for ' + s.name + ' (0 to 3). Keep it equal to the markup on its Deriv app.', String(s.markup_percent));
+                if (v === null) return; act({ action: 'set_markup', site_id: s.id, markup_percent: v.trim() }); } }));
             btns.appendChild(el('button', { text: 'Set rate', onclick: function () {
                 var v = prompt('Platform share % for ' + s.name + ' (blank = plan default)', String(s.platform_share));
                 if (v === null) return; act({ action: 'set_rate', site_id: s.id, platform_share: v.trim() === '' ? null : Number(v) }); } }));
             btns.appendChild(el('button', { text: 'Delete', onclick: function () {
                 if (confirm('Permanently delete the site "' + s.name + '" (' + s.domain + ')? This cannot be undone.')) act({ action: 'delete_site', site_id: s.id }); } }));
-            return [s.name, s.domain, s.plan, el('span', { class: 'pill', text: s.status }), s.platform_share + '%', s.owner_email || '', btns];
+            return [s.name, s.domain, s.plan, el('span', { class: 'pill', text: s.status }), s.platform_share + '%', Number(s.markup_percent) + '%', s.app_id ? s.app_id : el('span', { class: 'pill', text: 'awaiting App ID' }), s.owner_email || '', btns];
         });
-        app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Sites' }), table(['Name', 'Domain', 'Plan', 'Status', 'You keep', 'Owner', 'Actions'], siteRows)]));
+        app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Sites' }), table(['Name', 'Domain', 'Plan', 'Status', 'You keep', 'Markup', 'App ID', 'Owner', 'Actions'], siteRows)]));
 
         var ownerRows = owners.map(function (o) {
             var b = o.role === 'operator' ? el('div', { class: 'row' }, [
