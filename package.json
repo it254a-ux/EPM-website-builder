@@ -6,7 +6,8 @@
   "scripts": {
     "dev": "rsbuild dev --port 4003",
     "build": "rsbuild build",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "test:api": "node --test api/__tests__/*.test.js"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
@@ -16,6 +17,7 @@
     "react-router-dom": "^7.18.4"
   },
   "devDependencies": {
+    "@electric-sql/pglite": "^0.5.8",
     "@rsbuild/core": "^1.0.1",
     "@rsbuild/plugin-react": "^1.0.1",
     "@types/react": "^18.3.3",

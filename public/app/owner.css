@@ -65,3 +65,8 @@ details{border-bottom:1px solid var(--line);padding:12px 0}details:last-child{bo
  .scrim{position:fixed;inset:0;background:rgba(11,31,58,.45);z-index:30}
  .menu{display:block}.top{padding:10px 14px}.top .who{font-size:.7rem}#view{padding:16px 14px 50px}.stats{grid-template-columns:1fr}
 }
+
+.btn.google{width:100%;justify-content:center;background:#fff;border:1px solid #dadce0;color:#3c4043;padding:11px 16px}
+.btn.google:hover{border-color:#bdc1c6;background:#f8f9fa}
+.divider{display:flex;align-items:center;gap:12px;color:var(--muted);font-size:.8rem;margin:16px 0 2px}
+.divider:before,.divider:after{content:"";flex:1;height:1px;background:var(--line)}

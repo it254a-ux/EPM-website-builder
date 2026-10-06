@@ -629,7 +629,7 @@ const privacySections: LegalSection[] = [
   { title: 'Information we collect', paragraphs: [
     'We collect only what we need to run the Platform:',
   ], bullets: [
-    'Account details: your name, email address and a securely hashed version of your password. We never store your password in readable form.',
+    'Account details: your name, your email address and, if you sign up with a password, a securely hashed version of it. We never store your password in readable form. If you continue with Google, we receive your name and verified email address from Google. We do not receive your Google password.',
     'Site details: your site name, logo link, colours, font, About, Vision and Mission text, your domain, and any support contacts you choose to publish.',
     'Payout details: the information you give us so that we can pay your commission.',
     'Technical data: your IP address and basic request information, used to keep the service secure and to limit repeated login attempts.',

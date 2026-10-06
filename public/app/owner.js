@@ -6,7 +6,7 @@
     var WA = '254115533208', WA_SHOW = '+254 115 533 208';
     var FONTS = ['', 'Inter', 'Roboto', 'Poppins', 'DM Sans', 'Lato', 'Nunito', 'Open Sans', 'Montserrat', 'Raleway', 'Source Sans 3'];
     var root = document.getElementById('app');
-    var S = { owner: null, site: null, freeRoot: '', dns: { cname: 'cname.vercel-dns-0.com', a: '76.76.21.21' }, events: [] };
+    var S = { owner: null, site: null, google: false, freeRoot: '', dns: { cname: 'cname.vercel-dns-0.com', a: '76.76.21.21' }, events: [] };
     var installEvent = null, viewEl = null, sideEl = null, scrimEl = null, whoEl = null;
 
     /* ---------- helpers ---------- */
@@ -35,6 +35,24 @@
         s.setAttribute('stroke-width', '2'); s.setAttribute('stroke-linecap', 'round'); s.setAttribute('stroke-linejoin', 'round');
         var p = document.createElementNS(ns, 'path'); p.setAttribute('d', d); s.appendChild(p); return s;
     }
+    function googleIcon() {
+        var ns = 'http://www.w3.org/2000/svg', s = document.createElementNS(ns, 'svg');
+        s.setAttribute('viewBox', '0 0 48 48'); s.setAttribute('width', '18'); s.setAttribute('height', '18');
+        [['#EA4335', 'M24 9.5c3.54 0 6.71 1.22 9.21 3.6l6.85-6.85C35.9 2.38 30.47 0 24 0 14.62 0 6.51 5.38 2.56 13.22l7.98 6.19C12.43 13.72 17.74 9.5 24 9.5z'],
+         ['#4285F4', 'M46.98 24.55c0-1.57-.15-3.09-.38-4.55H24v9.02h12.94c-.58 2.96-2.26 5.48-4.78 7.18l7.73 6c4.51-4.18 7.09-10.36 7.09-17.65z'],
+         ['#FBBC05', 'M10.53 28.59c-.48-1.45-.76-2.99-.76-4.59s.27-3.14.76-4.59l-7.98-6.19C.92 16.46 0 20.12 0 24c0 3.88.92 7.54 2.56 10.78l7.97-6.19z'],
+         ['#34A853', 'M24 48c6.48 0 11.93-2.13 15.89-5.81l-7.73-6c-2.15 1.45-4.92 2.3-8.16 2.3-6.26 0-11.57-4.22-13.47-9.91l-7.98 6.19C6.51 42.62 14.62 48 24 48z']]
+            .forEach(function (p) { var e = document.createElementNS(ns, 'path'); e.setAttribute('fill', p[0]); e.setAttribute('d', p[1]); s.appendChild(e); });
+        return s;
+    }
+    var GOOGLE_MESSAGES = {
+        unavailable: 'Google sign-in is not available right now.',
+        denied: 'Google sign-in was cancelled.',
+        error: 'We could not sign you in with Google. Please try again.',
+        terms: 'There is no account for that Google address yet. Choose "Create an account", tick the Privacy Policy and Terms box, then continue with Google.',
+        admin: 'That is an admin account. Please use the admin sign-in instead.',
+        disabled: 'This account has been disabled. Please contact support.',
+    };
     var ICON = {
         grid: 'M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z',
         globe: 'M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20zM2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20',
@@ -72,7 +90,7 @@
     function showFieldErrors(fields, res) { Object.keys(fields).forEach(function (k) { if (fields[k].setError) fields[k].setError((res.fields && res.fields[k]) || ''); }); }
 
     /* ---------- sign up / sign in ---------- */
-    function authView(startRegistering) {
+    function authView(startRegistering, notice) {
         document.title = 'EPM site owner dashboard';
         clear(root);
         var registering = !!startRegistering;
@@ -126,9 +144,20 @@
             el('ul', {}, [el('li', { text: 'Free address live the moment you create it' }), el('li', { text: 'Your name, logo, colours and typeface' }),
                 el('li', { text: 'Keep up to 85% of commission' })]),
         ]);
-        var card = el('div', { class: 'card auth-card' }, [title, sub, name.wrap, email.wrap, pw.wrap, pw2.wrap, termsRow, termsErr, msg, btn, sw]);
+        var googleBlock = null;
+        if (S.google) {
+            var gBtn = el('button', { type: 'button', class: 'btn google' }, [googleIcon(), el('span', { text: 'Continue with Google' })]);
+            gBtn.addEventListener('click', function () {
+                termsErr.textContent = '';
+                if (registering && !terms.checked) { termsErr.textContent = 'Please accept the Privacy Policy and Terms of Service first.'; return; }
+                location.href = '/api/google?start=1&terms=' + (registering && terms.checked ? '1' : '0');
+            });
+            googleBlock = el('div', {}, [el('div', { style: 'margin-top:14px' }, [gBtn]), el('div', { class: 'divider', text: 'or' })]);
+        }
+        var card = el('div', { class: 'card auth-card' }, [title, sub, googleBlock, name.wrap, email.wrap, pw.wrap, pw2.wrap, termsRow, termsErr, msg, btn, sw]);
         root.appendChild(el('div', { class: 'auth' }, [promo, card]));
         sync();
+        if (notice) msg.textContent = notice;
     }
 
     /* ---------- shell ---------- */
@@ -395,14 +424,15 @@
         v.appendChild(el('div', { class: 'card row between' }, [el('div', {}, [el('h2', { text: 'Install the EPM app' }),
             el('span', { class: 'muted', text: installEvent ? 'Add EPM to this device for one-tap access and a full-screen experience.' : 'Use your browser\u2019s menu and choose "Install" or "Add to home screen" to add EPM to this device.' })]), installBtn]));
 
+        var hasPw = o.has_password !== false;
         var pw = pwField('password', 'Your password'), conf = field('confirm', 'Type DELETE to confirm', 'text'), msg = el('div', { class: 'err' });
         var del = el('button', { class: 'btn danger', text: 'Delete my account', onclick: function () {
             msg.textContent = ''; del.disabled = true;
-            api('/api/auth?action=delete_account', 'POST', { password: pw.input.value, confirm: conf.input.value }).then(function (r) {
+            api('/api/auth?action=delete_account', 'POST', { password: hasPw ? pw.input.value : undefined, confirm: conf.input.value }).then(function (r) {
                 del.disabled = false;
                 if (r.ok) { S.owner = null; S.site = null; authView(false); toast('Your account has been deleted.'); } else msg.textContent = r.error || 'Could not delete the account.'; }); } });
         v.appendChild(el('div', { class: 'card danger-zone' }, [el('h2', { text: 'Danger zone' }),
-            el('p', { class: 'muted', text: 'Deleting your account is permanent. Your site goes offline and your settings are removed.' }), pw.wrap, conf.wrap, msg, del]));
+            el('p', { class: 'muted', text: 'Deleting your account is permanent. Your site goes offline and your settings are removed.' + (hasPw ? '' : ' You signed in with Google, so there is no password to enter.') }), hasPw ? pw.wrap : null, conf.wrap, msg, del]));
         return v;
     }
 
@@ -415,7 +445,13 @@
     }
     function boot() {
         api('/api/auth?action=me').then(function (r) {
-            if (!r.owner) { S.owner = null; return authView(false); }
+            S.google = !!r.google;
+            if (!r.owner) {
+                S.owner = null;
+                var code = new URLSearchParams(location.search).get('google');
+                if (code) history.replaceState(null, '', location.pathname + location.hash);
+                return authView(code === 'terms', code ? (GOOGLE_MESSAGES[code] || GOOGLE_MESSAGES.error) : '');
+            }
             S.owner = r.owner;
             if (r.owner.role === 'admin') {
                 clear(root); root.appendChild(el('div', { class: 'auth' }, [el('div', { class: 'card' }, [el('h2', { text: 'Admin account' }), el('p', { class: 'muted', text: 'Use the admin panel to manage sites and accounts.' }), el('a', { class: 'btn primary', href: '/admin', text: 'Go to the admin panel' })])]));

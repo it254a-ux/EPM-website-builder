@@ -151,14 +151,14 @@ async function getSession(sql, req) {
     const token = parseCookies(req.headers.cookie)[COOKIE_NAME];
     if (!token || !/^[0-9a-f]{64}$/.test(token)) return null;
     const rows = await sql`
-        SELECT o.id, o.email, o.name, o.role, o.disabled
+        SELECT o.id, o.email, o.name, o.role, o.disabled, (o.password_hash LIKE 'scrypt$%') AS has_password
         FROM sessions s JOIN owners o ON o.id = s.owner_id
         WHERE s.token_hash = ${hashToken(token)} AND s.expires_at > now()
         LIMIT 1
     `;
     const row = rows[0];
     if (!row || row.disabled) return null;
-    return { id: row.id, email: row.email, name: row.name, role: row.role };
+    return { id: row.id, email: row.email, name: row.name, role: row.role, has_password: !!row.has_password };
 }
 
 const destroySession = (sql, req) => {
@@ -173,6 +173,6 @@ module.exports = {
     COOKIE_NAME, SESSION_DAYS, MIN_PASSWORD, MAX_PASSWORD,
     hashPassword, verifyPassword, dummyVerify, validatePassword, validateEmail,
     newToken, hashToken, parseCookies, sessionCookie, clearCookie,
-    requestHost, onPlatformHost, sameOrigin, clientIp,
+    requestHost, onPlatformHost, sameOrigin, clientIp, isSecureRequest,
     hit, clearHits, createSession, getSession, destroySession, readBody,
 };

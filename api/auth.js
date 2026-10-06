@@ -23,7 +23,7 @@ module.exports = async function handler(req, res) {
     try {
         if (req.method === 'GET' && action === 'me') {
             const me = await A.getSession(sql, req);
-            return send(res, 200, { owner: me });
+            return send(res, 200, { owner: me, google: !!(process.env.GOOGLE_CLIENT_ID && process.env.GOOGLE_CLIENT_SECRET) });
         }
 
         if (req.method !== 'POST') return send(res, 405, { error: 'Method not allowed' });
@@ -96,7 +96,9 @@ module.exports = async function handler(req, res) {
             if ((await A.hit(sql, `delete:owner:${me.id}`, 3600)) > 5) return send(res, 429, { error: 'Too many attempts. Please try again later.' });
             if (String(body.confirm || '').trim() !== 'DELETE') return send(res, 400, { error: 'Type DELETE to confirm.' });
             const row = (await sql`SELECT password_hash FROM owners WHERE id = ${me.id} LIMIT 1`)[0];
-            const okPw = row ? await A.verifyPassword(typeof body.password === 'string' ? body.password.slice(0, A.MAX_PASSWORD) : '', row.password_hash) : false;
+            // Accounts created with Google have no password; for them the word DELETE is the confirmation.
+            const noPassword = row && !String(row.password_hash).startsWith('scrypt$');
+            const okPw = noPassword ? true : row ? await A.verifyPassword(typeof body.password === 'string' ? body.password.slice(0, A.MAX_PASSWORD) : '', row.password_hash) : false;
             if (!okPw) return send(res, 401, { error: 'Incorrect password.' });
             const gone = await sql`DELETE FROM sites WHERE owner_id = ${me.id} RETURNING domain`;
             await sql`DELETE FROM owners WHERE id = ${me.id}`; // sessions go with it
