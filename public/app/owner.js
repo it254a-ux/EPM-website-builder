@@ -332,28 +332,69 @@
 
     function domainsView() {
         var v = el('div'), site = S.site;
-        v.appendChild(head('Infrastructure', 'Domains', 'Your platform address and your own domain.'));
-        if (!site) { v.appendChild(el('div', { class: 'card' }, [el('p', { text: 'Create a site first, then you can connect your own domain.' }), el('a', { class: 'btn primary', href: '#/sites/new', text: 'Create site' })])); return v; }
-        v.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Your address' }),
-            el('div', { class: 'row' }, [el('strong', { text: site.domain }), pill(site.status, site.status), pill(site.plan === 'free' ? 'Free address' : 'Own domain')]),
-            el('p', { class: 'muted small', text: site.plan === 'free' ? 'Free address: you keep 75% of commission and the platform handles support.' : 'Your own domain: you keep 85% of commission and you handle your own support.' })]));
-        if (site.plan === 'free') {
-            if (site.custom_domain_requested) {
-                v.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Own domain requested' }), el('p', {}, ['You asked to move to ', el('strong', { text: site.custom_domain_requested }), '. We activate it after review once the DNS record below is in place.'])]));
-                v.appendChild(dnsInstructions(site.custom_domain_requested));
-            } else {
-                var d = field('domain', 'Your domain', 'text', '', 'e.g. trade.yourbrand.com. Moving to your own domain lowers the platform share to 15%.');
-                var m = el('div', { class: 'err' });
-                v.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Connect your own domain' }), d.wrap,
-                    el('button', { class: 'btn primary', text: 'Request my own domain', onclick: function () {
-                        m.textContent = '';
-                        api('/api/my-site', 'PUT', { action: 'request_custom_domain', domain: d.input.value }).then(function (r) {
-                            if (r.site) { loadSite().then(function () { toast('Request sent.'); route(); }); } else m.textContent = r.error || 'Could not send the request.'; }); } }), m]));
-            }
-        } else {
-            v.appendChild(dnsInstructions(site.domain));
+        v.appendChild(head('Infrastructure', 'Domains', 'Your platform address, your own domains, and buying a new one.'));
+        if (!site) { v.appendChild(el('div', { class: 'card' }, [el('p', { text: 'Create a site first, then you can connect or buy a domain.' }), el('a', { class: 'btn primary', href: '#/sites/new', text: 'Create site' })])); return v; }
+
+        var TABS = [['yours', 'Your address'], ['buy', 'Buy a domain'], ['own', 'Connect your own'], ['history', 'Payment history']];
+        var cur = S.domainTab || 'yours';
+        var tabBar = el('div', { class: 'tabs', role: 'tablist' }, TABS.map(function (t) {
+            return el('button', { type: 'button', role: 'tab', class: 'tab' + (t[0] === cur ? ' on' : ''), 'aria-selected': t[0] === cur ? 'true' : 'false', text: t[1],
+                onclick: function () { S.domainTab = t[0]; route(); } });
+        }));
+        v.appendChild(tabBar);
+        var body = el('div');
+        v.appendChild(body);
+
+        if (cur === 'yours') {
+            body.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Your address' }),
+                el('div', { class: 'row' }, [el('strong', { text: site.domain }), pill(site.status, site.status), pill(site.plan === 'free' ? 'Free address' : 'Own domain')]),
+                el('p', { class: 'muted small', text: site.plan === 'free' ? 'Free address: you keep 75% of commission and the platform handles support.' : 'Your own domain: you keep 85% of commission and you handle your own support.' })]));
+            if (site.plan !== 'free') body.appendChild(dnsInstructions(site.domain));
         }
-        v.appendChild(el('p', { class: 'muted small', text: 'Buying a domain inside the dashboard is coming later.' }));
+
+        if (cur === 'own') {
+            if (site.plan === 'free') {
+                if (site.custom_domain_requested) {
+                    body.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Own domain requested' }), el('p', {}, ['You asked to move to ', el('strong', { text: site.custom_domain_requested }), '. We activate it after review once the DNS record below is in place.'])]));
+                    body.appendChild(dnsInstructions(site.custom_domain_requested));
+                } else {
+                    var d = field('domain', 'Your domain', 'text', '', 'e.g. trade.yourbrand.com. Moving to your own domain lowers the platform share to 15%.');
+                    var m = el('div', { class: 'err' });
+                    body.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Connect a domain you already own' }), d.wrap,
+                        el('button', { class: 'btn primary', text: 'Request my own domain', onclick: function () {
+                            m.textContent = '';
+                            api('/api/my-site', 'PUT', { action: 'request_custom_domain', domain: d.input.value }).then(function (r) {
+                                if (r.site) { loadSite().then(function () { toast('Request sent.'); route(); }); } else m.textContent = r.error || 'Could not send the request.'; }); } }), m]));
+                }
+            } else {
+                body.appendChild(dnsInstructions(site.domain));
+            }
+        }
+
+        if (cur === 'buy') {
+            var q = el('input', { type: 'text', name: 'domain-search', placeholder: 'Type the name you want, e.g. mybrandtrading', autocomplete: 'off', spellcheck: 'false' });
+            var out = el('div', { class: 'muted small', style: 'margin-top:12px' });
+            function search() {
+                var name = String(q.value || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '');
+                var label = name.split('.')[0];
+                clear(out);
+                if (!label) { out.textContent = 'Type a name to search.'; return; }
+                if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(label)) { out.textContent = 'Use only letters, numbers and hyphens, with no spaces, and do not start or end with a hyphen.'; return; }
+                out.appendChild(el('p', {}, ['Searching for ', el('strong', { text: label }), ' is not switched on yet.']));
+                out.appendChild(el('p', { text: 'Availability and prices in KES will appear here once a domain registrar and M-Pesa payments are connected. Nothing is charged today.' }));
+            }
+            q.addEventListener('keydown', function (e) { if (e.key === 'Enter') search(); });
+            body.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Find a domain' }),
+                el('p', { class: 'muted small', text: 'Search for a name, pick one, pay by M-Pesa, and we connect it to your site. Buying a domain moves you to the own-domain plan, where you keep 85% of commission.' }),
+                el('div', { class: 'row' }, [q, el('button', { class: 'btn primary', text: 'Search', onclick: search })]), out]));
+            body.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'How buying will work' }),
+                el('ol', { class: 'muted small' }, [el('li', { text: 'Search a name and see the price.' }), el('li', { text: 'Pay by M-Pesa. Your payment is confirmed automatically.' }),
+                    el('li', { text: 'We register the domain and connect it to your site. No DNS work needed.' }), el('li', { text: 'The purchase appears under Payment history.' })])]));
+        }
+
+        if (cur === 'history') {
+            body.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Payment history' }), el('p', { class: 'muted', text: 'No domain payments yet. Purchases will be listed here with the date, amount and status.' })]));
+        }
         return v;
     }
 
