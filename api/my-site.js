@@ -110,7 +110,7 @@ module.exports = async function handler(req, res) {
             let markup = S.MARKUP_DEFAULT;
             if (body.markup_percent !== undefined && String(body.markup_percent).trim() !== '') {
                 markup = S.sanitizeMarkup(body.markup_percent);
-                if (markup === null) errors.markup_percent = `Enter a markup between 0 and ${S.MARKUP_MAX}%.`;
+                if (markup === null) errors.markup_percent = `Enter a markup between ${S.MARKUP_MIN} and ${S.MARKUP_MAX}%.`;
             }
             if (Object.keys(errors).length) return send(res, 400, { error: 'Please fix the highlighted fields.', fields: errors });
 
@@ -154,9 +154,15 @@ module.exports = async function handler(req, res) {
             return send(res, 200, { site: view(await findOwn(sql, me.id)) });
         }
 
-        // Operators can edit ONLY these fields: never domain, plan, status, commission, markup or App ID.
+        // Operators can edit ONLY these fields (and the markup, 1 to 3%): never domain, plan, status, commission or App ID.
         const checked = S.validateSiteInput(body, { ignoreContacts: row.plan === 'free' });
-        if (!checked.ok) return send(res, 400, { error: 'Please fix the highlighted fields.', fields: checked.errors });
+        const editErrors = { ...checked.errors };
+        let newMarkup = null;
+        if (body.markup_percent !== undefined && String(body.markup_percent).trim() !== '') {
+            newMarkup = S.sanitizeMarkup(body.markup_percent);
+            if (newMarkup === null) editErrors.markup_percent = `Enter a markup between ${S.MARKUP_MIN} and ${S.MARKUP_MAX}%.`;
+        }
+        if (Object.keys(editErrors).length) return send(res, 400, { error: 'Please fix the highlighted fields.', fields: editErrors });
         const v = checked.value;
         await sql`
             UPDATE sites SET
@@ -171,9 +177,12 @@ module.exports = async function handler(req, res) {
                 phone = COALESCE(${n(v.phone)}, phone),
                 support_email = COALESCE(${n(v.support_email)}, support_email),
                 telegram = COALESCE(${n(v.telegram)}, telegram),
+                markup_percent = COALESCE(${newMarkup}, markup_percent),
                 updated_at = now()
             WHERE id = ${row.id} AND owner_id = ${me.id}
         `;
+        const oldMarkup = row.markup_percent === null || row.markup_percent === undefined ? S.MARKUP_DEFAULT : Number(row.markup_percent);
+        if (newMarkup !== null && newMarkup !== oldMarkup) await logEvent(sql, row.id, 'markup_changed', { from: oldMarkup, to: newMarkup });
         await logEvent(sql, row.id, 'details_updated', {});
         return send(res, 200, { site: view(await findOwn(sql, me.id)) });
     } catch (err) {

@@ -59,7 +59,7 @@ test('the operator can choose a markup when creating the site', async () => {
 
 test('a markup above 3% or malformed is refused and nothing is created', async () => {
     const op = await login('operator', 'op@example.com');
-    for (const bad of ['3.5', '-1', 'abc', '1.999']) {
+    for (const bad of ['3.5', '0.5', '0', '-1', 'abc', '1.999']) {
         const r = await call(mySite, { method: 'POST', cookie: op.cookie, body: { name: 'Julias Trades', subdomain: 'julias', markup_percent: bad } });
         assert.equal(r.status, 400, bad);
         assert.ok(r.body.fields.markup_percent, bad);
@@ -67,14 +67,37 @@ test('a markup above 3% or malformed is refused and nothing is created', async (
     assert.equal((await sql`SELECT count(*)::int AS n FROM sites`)[0].n, 0);
 });
 
-test('an operator cannot change markup or App ID by editing the site', async () => {
+test('an operator can change the markup (1 to 3%) but never the App ID', async () => {
     const op = await login('operator', 'op@example.com');
     await call(mySite, { method: 'POST', cookie: op.cookie, body: { name: 'Julias Trades', subdomain: 'julias', markup_percent: '2' } });
-    const r = await call(mySite, { method: 'PUT', cookie: op.cookie, body: { name: 'Renamed', markup_percent: '0.1', app_id: 'HACKED123' } });
+    const r = await call(mySite, { method: 'PUT', cookie: op.cookie, body: { name: 'Renamed', markup_percent: '2.75', app_id: 'HACKED123' } });
     assert.equal(r.status, 200);
     assert.equal(r.body.site.name, 'Renamed');
-    assert.equal(r.body.site.markup_percent, 2);
+    assert.equal(r.body.site.markup_percent, 2.75);
     assert.equal(r.body.site.app_id, '');
+    for (const bad of ['0.5', '3.5', 'x']) {
+        const e = await call(mySite, { method: 'PUT', cookie: op.cookie, body: { markup_percent: bad } });
+        assert.equal(e.status, 400, bad);
+        assert.ok(e.body.fields.markup_percent, bad);
+    }
+    assert.equal((await call(mySite, { cookie: op.cookie })).body.site.markup_percent, 2.75);
+});
+
+test('the admin is told when a markup changes after the App ID was assigned', async () => {
+    const op = await login('operator', 'op@example.com');
+    const adm = await login('admin', 'admin@example.com');
+    await call(mySite, { method: 'POST', cookie: op.cookie, body: { name: 'Julias Trades', subdomain: 'julias', markup_percent: '2' } });
+    const siteId = (await sql`SELECT id FROM sites LIMIT 1`)[0].id;
+    const pending = async () => (await call(admin, { cookie: adm.cookie, query: { resource: 'sites' } })).body.sites[0].markup_pending;
+    assert.equal(await pending(), false);
+    await call(mySite, { method: 'PUT', cookie: op.cookie, body: { markup_percent: '2.5' } });
+    assert.equal(await pending(), false, 'no App ID yet, nothing to update on Deriv');
+    await call(admin, { method: 'POST', cookie: adm.cookie, body: { action: 'set_app_id', site_id: siteId, app_id: 'ABC12345' } });
+    assert.equal(await pending(), false);
+    await call(mySite, { method: 'PUT', cookie: op.cookie, body: { markup_percent: '3' } });
+    assert.equal(await pending(), true);
+    await call(admin, { method: 'POST', cookie: adm.cookie, body: { action: 'set_markup', site_id: siteId, markup_percent: '3' } });
+    assert.equal(await pending(), false);
 });
 
 test('only an admin can assign an App ID or set the markup', async () => {

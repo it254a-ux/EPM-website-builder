@@ -260,14 +260,14 @@
         var input = el('input', { name: 'markup_percent', type: 'text', inputmode: 'decimal', autocomplete: 'off', 'aria-label': 'Markup percentage' });
         input.value = Number(initial).toFixed(2);
         var err = el('div', { class: 'err' });
-        function clamp(n) { return Math.min(3, Math.max(0, Math.round(n * 100) / 100)); }
+        function clamp(n) { return Math.min(3, Math.max(1, Math.round(n * 100) / 100)); }
         function bump(d) { var n = parseFloat(input.value); if (!isFinite(n)) n = 1; input.value = clamp(n + d).toFixed(2); err.textContent = ''; }
         var minus = el('button', { type: 'button', class: 'stepbtn', 'aria-label': 'Decrease markup', text: '\u2212', onclick: function () { bump(-0.1); } });
         var plus = el('button', { type: 'button', class: 'stepbtn', 'aria-label': 'Increase markup', text: '+', onclick: function () { bump(0.1); } });
         input.addEventListener('blur', function () { var n = parseFloat(input.value); if (isFinite(n)) input.value = clamp(n).toFixed(2); });
         var wrap = el('div', {}, [el('label', { text: 'Markup percentage' }),
             el('div', { class: 'stepper' }, [minus, input, el('span', { class: 'pct', text: '%' }), plus]),
-            el('div', { class: 'muted small', text: 'The extra percentage added on your clients\u2019 trades, between 0 and 3%. It is what earns commission. A higher markup earns more but makes trading costlier for your clients. After you create the site it is set up on your own Deriv app, and changing it later goes through support.' }), err]);
+            el('div', { class: 'muted small', text: 'The extra percentage added on your clients\u2019 trades, between 1 and 3%. It is what earns commission. A higher markup earns more but makes trading costlier for your clients. You can change it any time; we then update it on your Deriv app.' }), err]);
         return { wrap: wrap, input: input, setError: function (m) { err.textContent = m || ''; } };
     }
 
@@ -296,9 +296,11 @@
             var mkF = markupField(1); fields.markup_percent = mkF;
             v.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Your markup' }), mkF.wrap]));
         }
-        if (!creating && site) v.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Markup and App ID' }),
-            el('p', { style: 'margin:0 0 6px' }, ['Markup: ', el('b', { text: Number(site.markup_percent).toFixed(2) + '%' })]),
-            el('p', { class: 'muted small', style: 'margin:0', text: site.app_id ? 'Your App ID is ' + site.app_id + '. To change your markup, contact support so it stays the same on your Deriv app.' : 'Your App ID has not been assigned yet. To change your markup, contact support.' })]));
+        if (!creating && site) {
+            var mkE = markupField(site.markup_percent); fields.markup_percent = mkE;
+            v.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Markup and App ID' }), mkE.wrap,
+                el('p', { class: 'muted small', style: 'margin:12px 0 0', text: site.app_id ? 'Your App ID is ' + site.app_id + '.' : 'Your App ID has not been assigned yet.' })]));
+        }
         var brand = el('div', { class: 'card' }, [el('h2', { text: 'Branding' })]);
         [['name', 'Site name', 'text'], ['logo_url', 'Logo URL (https://\u2026)', 'text'], ['primary_color', 'Main colour (#rrggbb)', 'text'], ['font', 'Font', 'font'],
             ['about', 'About', 'textarea'], ['vision', 'Vision', 'textarea'], ['mission', 'Mission', 'textarea']].forEach(function (d) {
@@ -426,6 +428,8 @@
         custom_domain_approved: function (d) { return 'Own domain approved' + (d && d.domain ? ': ' + d.domain : ''); },
         status_changed: function (d) { return d && d.status === 'active' ? 'Site set live' : d && d.status === 'suspended' ? 'Site suspended' : 'Site set to pending review'; },
         details_updated: function () { return 'Site details updated'; },
+        markup_changed: function (d) { return 'Markup changed' + (d && d.from !== undefined ? ' from ' + d.from + '% to ' + d.to + '%' : ''); },
+        markup_confirmed: function () { return 'Markup confirmed on Deriv'; },
         app_id_assigned: function () { return 'Deriv App ID assigned'; },
         app_id_cleared: function () { return 'Deriv App ID removed'; },
     };

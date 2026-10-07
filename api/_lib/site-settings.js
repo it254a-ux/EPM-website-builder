@@ -11,7 +11,8 @@ const SUPPORTED_FONTS = [
 // What YOU keep (percent) per plan. Change here, or override per site in the DB.
 const PLAN_SHARE = { free: 25, custom: 15 };
 
-// Deriv markup the operator picks for their site: 0 to 3 percent, two decimals.
+// Deriv markup for a site: 1 to 3 percent, two decimals.
+const MARKUP_MIN = 1;
 const MARKUP_MAX = 3;
 const MARKUP_DEFAULT = 1;
 function sanitizeMarkup(v) {
@@ -19,7 +20,7 @@ function sanitizeMarkup(v) {
     const raw = String(v).trim().replace(/%$/, '');
     if (!/^\d{1,2}(\.\d{1,2})?$/.test(raw)) return null;
     const n = Number(raw);
-    return n >= 0 && n <= MARKUP_MAX ? Math.round(n * 100) / 100 : null;
+    return n >= MARKUP_MIN && n <= MARKUP_MAX ? Math.round(n * 100) / 100 : null;
 }
 // A Deriv App ID: letters and numbers only. Blank means "clear it".
 function sanitizeAppId(v) {
@@ -211,5 +212,5 @@ module.exports = {
     sanitizeName, sanitizeColor, sanitizeFont, sanitizeLogoUrl,
     sanitizeWhatsapp, sanitizePhone, sanitizeEmail, sanitizeTelegram,
     sanitizeDomain, sanitizeSubdomain, sanitizeText, validateSiteInput, toPublicSite,
-    PLAN_SHARE, MARKUP_MAX, MARKUP_DEFAULT, sanitizeMarkup, sanitizeAppId, RESERVED_SUBDOMAINS, normalizeHost, parsePlatformHosts, decide, isLocalHost,
+    PLAN_SHARE, MARKUP_MIN, MARKUP_MAX, MARKUP_DEFAULT, sanitizeMarkup, sanitizeAppId, RESERVED_SUBDOMAINS, normalizeHost, parsePlatformHosts, decide, isLocalHost,
 };

@@ -37,6 +37,10 @@ module.exports = async function handler(req, res) {
             if (resource === 'sites') {
                 const rows = await sql`
                     SELECT s.id, s.domain, s.name, s.plan, s.status, s.custom_domain_requested, s.commission_rate_override, s.markup_percent, s.app_id,
+                           (s.app_id IS NOT NULL AND EXISTS (
+                               SELECT 1 FROM site_events e WHERE e.site_id = s.id AND e.event = 'markup_changed'
+                                 AND e.id > COALESCE((SELECT max(x.id) FROM site_events x WHERE x.site_id = s.id AND x.event IN ('app_id_assigned', 'markup_confirmed')), 0)
+                           )) AS markup_pending,
                            s.created_at, o.email AS owner_email, o.name AS owner_name
                     FROM sites s LEFT JOIN owners o ON o.id = s.owner_id
                     ORDER BY s.created_at DESC LIMIT 500
@@ -138,9 +142,10 @@ module.exports = async function handler(req, res) {
                 const site = await getSite();
                 if (!site) return send(res, 404, { error: 'Site not found.' });
                 const markup = S.sanitizeMarkup(body.markup_percent);
-                if (markup === null) return send(res, 400, { error: `Markup must be between 0 and ${S.MARKUP_MAX}%.` });
+                if (markup === null) return send(res, 400, { error: `Markup must be between ${S.MARKUP_MIN} and ${S.MARKUP_MAX}%.` });
                 await sql`UPDATE sites SET markup_percent = ${markup}, updated_at = now() WHERE id = ${siteId}`;
                 await audit(sql, me.id, 'set_markup', siteId, { markup_percent: markup });
+                await logEvent(sql, siteId, 'markup_confirmed', { markup_percent: markup });
                 return send(res, 200, { ok: true });
             }
 
