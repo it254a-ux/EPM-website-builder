@@ -3,7 +3,7 @@ const A = require('./_lib/auth');
 const S = require('./_lib/site-settings');
 const { logEvent, listEvents } = require('./_lib/events');
 const { checkDomain } = require('./_lib/dns-check');
-const { tryAssign } = require('./_lib/app-pool');
+const { provisionApp, syncAppToDeriv } = require('./_lib/site-app');
 
 const send = (res, code, body) => res.status(code).json(body);
 const n = v => (v === undefined ? null : v);
@@ -19,13 +19,14 @@ const view = row => ({
     app_id: row.app_id || '',
     app_status: row.app_id ? 'assigned' : 'awaiting',
     markup_locked: !!row.app_pooled,              // the pre-made Deriv app fixes the markup
+    app_auto: row.app_source === 'api',           // created for this site through Deriv's API: markup changes reach Deriv by themselves
 });
 
 const findOwn = async (sql, ownerId) =>
     (await sql`
         SELECT id, domain, name, plan, status, primary_color, font, logo_url, about, vision, mission,
                whatsapp, phone, support_email, telegram, custom_domain_requested, commission_rate_override,
-               markup_percent, app_id,
+               markup_percent, app_id, app_source,
                EXISTS (SELECT 1 FROM app_pool p WHERE p.site_id = sites.id) AS app_pooled
         FROM sites WHERE owner_id = ${ownerId} LIMIT 1
     `)[0] || null;
@@ -131,7 +132,7 @@ module.exports = async function handler(req, res) {
             }
             await sql`INSERT INTO site_rate_history (site_id, plan, platform_share) VALUES (${created.id}, ${plan}, ${S.PLAN_SHARE[plan]})`;
             await logEvent(sql, created.id, 'site_created', { plan, domain, status, markup_percent: markup });
-            await tryAssign(sql, created.id, markup); // picks the next unused pre-made Deriv app for this markup, if you have stocked one
+            await provisionApp(sql, created.id); // creates the site's Deriv app through the API; falls back to a pre-made app, else the site waits
             return send(res, 201, { site: view(await findOwn(sql, me.id)) });
         }
 
@@ -163,6 +164,19 @@ module.exports = async function handler(req, res) {
         if (newMarkup !== null && newMarkup !== oldMarkup && row.app_pooled) editErrors.markup_percent = 'Your markup is fixed by your Deriv app. Contact support to change it.';
         if (Object.keys(editErrors).length) return send(res, 400, { error: 'Please fix the highlighted fields.', fields: editErrors });
         const v = checked.value;
+        // A markup change on an app we created for this site must reach Deriv FIRST. If Deriv refuses, nothing changes here either,
+        // so the markup shown to the operator is never different from the markup Deriv charges.
+        const markupChanged = newMarkup !== null && newMarkup !== oldMarkup;
+        let syncedToDeriv = false;
+        if (markupChanged && row.app_id && row.app_source === 'api') {
+            try {
+                await syncAppToDeriv(sql, { id: row.id, name: row.name, domain: row.domain, plan: row.plan, app_id: row.app_id }, { markup_percent: newMarkup });
+                syncedToDeriv = true;
+            } catch (err) {
+                console.error('deriv markup update failed for site', row.id, err && err.message);
+                return send(res, 502, { error: 'We could not update your markup on Deriv just now. Nothing was changed. Please try again in a moment.', fields: { markup_percent: 'Could not be updated on Deriv. Try again.' } });
+            }
+        }
         await sql`
             UPDATE sites SET
                 name = COALESCE(${n(v.name)}, name),
@@ -180,9 +194,10 @@ module.exports = async function handler(req, res) {
                 updated_at = now()
             WHERE id = ${row.id} AND owner_id = ${me.id}
         `;
-        if (newMarkup !== null && newMarkup !== oldMarkup) {
+        if (markupChanged) {
             await logEvent(sql, row.id, 'markup_changed', { from: oldMarkup, to: newMarkup });
-            if (!row.app_id) await tryAssign(sql, row.id, newMarkup); // still waiting: the new markup may match a stocked app
+            if (syncedToDeriv) await logEvent(sql, row.id, 'markup_confirmed', { markup_percent: newMarkup, auto: true });
+            if (!row.app_id) await provisionApp(sql, row.id); // still waiting: try again with the new markup (API first, then a stocked app)
         }
         await logEvent(sql, row.id, 'details_updated', {});
         return send(res, 200, { site: view(await findOwn(sql, me.id)) });

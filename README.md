@@ -59,3 +59,25 @@ Before production, implement and test:
 
 Any figures in the UI are illustrative and are not a promise of Deriv's
 terms, earnings, or payout timing.
+
+## Deriv apps for each site (automatic)
+
+When an operator creates a site, the backend registers a Deriv app for it through
+Deriv's API (`api/_lib/deriv-apps.js`) with that site's markup and redirect, and
+stores the App ID on the site. Markup changes are pushed to the same app. If Deriv
+is unreachable the site falls back to the pre-made App ID pool, and otherwise
+waits as "awaiting App ID" until an admin clicks **Create on Deriv**.
+
+Set these in Vercel (Settings, Environment Variables), then redeploy:
+
+| Variable | Needed | What it is |
+| --- | --- | --- |
+| `DERIV_ADMIN_TOKEN` | yes | A Deriv API token with the **Admin** scope. Keep it secret. |
+| `DERIV_REDIRECT_URI` | yes | The login return address of your main site (free sites share it). |
+| `DERIV_REDIRECT_PATH` | no | Path added to a custom domain, default `/`. |
+| `DERIV_APP_SCOPES` | no | Default `read,trade,trading_information`. |
+| `DERIV_WS_URL` / `DERIV_WS_APP_ID` | no | Override the Deriv socket address / the id used to open it. |
+
+The admin panel has a **Deriv connection** card with a Test connection button.
+Run `api/_lib/schema.sql` once in Neon (it is safe to run again) before deploying:
+it adds `sites.app_source`.

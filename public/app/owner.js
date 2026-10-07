@@ -300,7 +300,7 @@
             v.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Your markup' }), mkF.wrap]));
         }
         if (!creating && site) {
-            var mkE = markupField(site.markup_percent, site.markup_locked, site.app_id ? 'If you change it, our team updates it on your Deriv app.' : 'Your site gets its own Deriv app for the markup you pick.'); fields.markup_percent = mkE;
+            var mkE = markupField(site.markup_percent, site.markup_locked, site.app_auto ? 'If you change it, your Deriv app is updated for you straight away.' : site.app_id ? 'If you change it, our team updates it on your Deriv app.' : 'Your site gets its own Deriv app for the markup you pick.'); fields.markup_percent = mkE;
             v.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Markup and App ID' }), mkE.wrap,
                 el('p', { class: 'muted small', style: 'margin:12px 0 0', text: site.app_id ? 'Your App ID is ' + site.app_id + '.' : 'Your App ID has not been assigned yet.' })]));
         }
@@ -435,6 +435,8 @@
         markup_changed: function (d) { return 'Markup changed' + (d && d.from !== undefined ? ' from ' + d.from + '% to ' + d.to + '%' : ''); },
         markup_confirmed: function () { return 'Markup confirmed on Deriv'; },
         app_id_assigned: function () { return 'Deriv App ID assigned'; },
+        app_create_failed: function () { return 'Your Deriv app is not ready yet, we are finishing it'; },
+        app_redirect_updated: function () { return 'Deriv app moved to your own domain'; },
         app_id_cleared: function () { return 'Deriv App ID removed'; },
     };
     function deploymentsView() {

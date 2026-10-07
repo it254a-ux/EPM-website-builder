@@ -102,3 +102,8 @@ CREATE TABLE IF NOT EXISTS app_pool (
     created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS app_pool_free_idx ON app_pool (markup_percent, id) WHERE assigned_at IS NULL;
+
+-- ===== Where a site's App ID came from =====
+-- 'api' = created for the site through Deriv's API (its markup/redirect are then kept in step automatically);
+-- 'creating' = being created right now; NULL = pool or hand-assigned.
+ALTER TABLE sites ADD COLUMN IF NOT EXISTS app_source TEXT;

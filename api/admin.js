@@ -3,6 +3,8 @@ const A = require('./_lib/auth');
 const S = require('./_lib/site-settings');
 const { logEvent } = require('./_lib/events');
 const { assignFromPool, assignWaiting } = require('./_lib/app-pool');
+const deriv = require('./_lib/deriv-apps');
+const { provisionApp, syncAppToDeriv, reasonOf } = require('./_lib/site-app');
 
 const send = (res, code, body) => res.status(code).json(body);
 const n = v => (v === undefined ? null : v);
@@ -21,8 +23,8 @@ const audit = (sql, adminId, action, target, detail) =>
 //   2. needs a valid session whose account has role 'admin' (created only by scripts/create-admin.js)
 //   3. state-changing calls must come from the same site (no cross-site posts)
 //
-//   GET  /api/admin?resource=sites | owners | audit
-//   POST /api/admin  { action: set_status | update_site | approve_custom | set_app_id | set_markup | pool_add | pool_remove | assign_from_pool | set_rate | disable_owner | delete_site | delete_owner, ... }
+//   GET  /api/admin?resource=sites | owners | audit | pool | deriv
+//   POST /api/admin  { action: set_status | update_site | approve_custom | create_app | deriv_test | set_app_id | set_markup | pool_add | pool_remove | assign_from_pool | set_rate | disable_owner | delete_site | delete_owner, ... }
 module.exports = async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store');
     if (!A.onPlatformHost(req, 'strict')) return send(res, 404, { error: 'Not found' });
@@ -37,7 +39,7 @@ module.exports = async function handler(req, res) {
             const resource = String(req.query.resource || 'sites');
             if (resource === 'sites') {
                 const rows = await sql`
-                    SELECT s.id, s.domain, s.name, s.plan, s.status, s.custom_domain_requested, s.commission_rate_override, s.markup_percent, s.app_id,
+                    SELECT s.id, s.domain, s.name, s.plan, s.status, s.custom_domain_requested, s.commission_rate_override, s.markup_percent, s.app_id, s.app_source,
                            (s.app_id IS NOT NULL AND EXISTS (
                                SELECT 1 FROM site_events e WHERE e.site_id = s.id AND e.event = 'markup_changed'
                                  AND e.id > COALESCE((SELECT max(x.id) FROM site_events x WHERE x.site_id = s.id AND x.event IN ('app_id_assigned', 'markup_confirmed')), 0)
@@ -57,6 +59,10 @@ module.exports = async function handler(req, res) {
                     FROM app_pool p LEFT JOIN sites s ON s.id = p.site_id ORDER BY p.id DESC LIMIT 300`;
                 return send(res, 200, { tiers: tiers.map(t => ({ ...t, markup_percent: Number(t.markup_percent) })), apps });
             }
+            if (resource === 'deriv') {
+                // Is automatic app creation switched on? Names only what is missing, never the token itself.
+                return send(res, 200, { configured: deriv.isConfigured(), missing: deriv.missingSettings() });
+            }
             if (resource === 'owners') {
                 const rows = await sql`SELECT id, email, name, role, disabled, created_at FROM owners ORDER BY created_at DESC LIMIT 500`;
                 return send(res, 200, { owners: rows });
@@ -74,7 +80,7 @@ module.exports = async function handler(req, res) {
         const siteId = Number(body.site_id);
 
         const getSite = async () =>
-            (await sql`SELECT id, domain, plan, status, custom_domain_requested, commission_rate_override FROM sites WHERE id = ${siteId} LIMIT 1`)[0];
+            (await sql`SELECT id, name, domain, plan, status, custom_domain_requested, commission_rate_override, markup_percent, app_id, app_source FROM sites WHERE id = ${siteId} LIMIT 1`)[0];
 
         switch (body.action) {
             case 'set_status': {
@@ -131,7 +137,13 @@ module.exports = async function handler(req, res) {
                 await sql`INSERT INTO site_rate_history (site_id, plan, platform_share) VALUES (${siteId}, 'custom', ${share})`;
                 await logEvent(sql, siteId, 'custom_domain_approved', { domain: site.custom_domain_requested });
                 await audit(sql, me.id, 'approve_custom', siteId, { from: site.domain, to: site.custom_domain_requested, platform_share: share });
-                return send(res, 200, { ok: true });
+                // An app we created must now return to the new domain. The switch itself is already done, so a failure is reported, not fatal.
+                let derivWarning = null;
+                if (site.app_id && site.app_source === 'api') {
+                    try { await syncAppToDeriv(sql, site, { plan: 'custom', domain: site.custom_domain_requested }); await logEvent(sql, siteId, 'app_redirect_updated', { domain: site.custom_domain_requested }); }
+                    catch (err) { derivWarning = `The site is switched, but the Deriv app's redirect was not updated (${reasonOf(err)}). Update it in Deriv.`; }
+                }
+                return send(res, 200, derivWarning ? { ok: true, warning: derivWarning } : { ok: true });
             }
 
             // Stock the pool: IDs of apps you made in Deriv, all with the same markup. Waiting sites get them straight away.
@@ -175,6 +187,30 @@ module.exports = async function handler(req, res) {
                 return send(res, 200, { ok: true, app_id: appId });
             }
 
+            // Make the Deriv app for a waiting site now (for example after fixing the settings, or when Deriv was down at sign-up).
+            case 'create_app': {
+                const site = await getSite();
+                if (!site) return send(res, 404, { error: 'Site not found.' });
+                if (site.app_id) return send(res, 400, { error: 'This site already has an App ID.' });
+                const r = await provisionApp(sql, siteId);
+                if (!r.app_id) return send(res, 409, { error: r.error || 'Could not create the app.' });
+                await audit(sql, me.id, 'create_app', siteId, { app_id: r.app_id, source: r.source });
+                return send(res, 200, { ok: true, app_id: r.app_id, source: r.source });
+            }
+
+            // Checks the token and that it has the Admin scope. Changes nothing on Deriv.
+            case 'deriv_test': {
+                if (!deriv.isConfigured()) return send(res, 409, { error: `Not set up yet. Missing: ${deriv.missingSettings().join(', ')}.` });
+                try {
+                    const c = await deriv.checkConnection();
+                    if (!c.ok) return send(res, 409, { error: 'Connected, but this token does not have the Admin scope. Make a new token with Admin enabled.' });
+                    const missing = deriv.missingSettings();
+                    return send(res, 200, { ok: true, loginid: c.loginid, missing });
+                } catch (err) {
+                    return send(res, 502, { error: `Could not connect to Deriv: ${reasonOf(err)}` });
+                }
+            }
+
             // The Deriv app you created for this site. Blank clears it (back to "awaiting").
             case 'set_app_id': {
                 const site = await getSite();
@@ -184,7 +220,7 @@ module.exports = async function handler(req, res) {
                 if (raw !== '' && appId === null) return send(res, 400, { error: 'An App ID uses letters and numbers only.' });
                 // A hand-picked App ID replaces a pooled one: the pooled app is retired (never reused) and the markup is editable again.
                 await sql`UPDATE app_pool SET site_id = NULL WHERE site_id = ${siteId} AND app_id <> ${appId === null ? '' : appId}`;
-                await sql`UPDATE sites SET app_id = ${appId}, updated_at = now() WHERE id = ${siteId}`;
+                await sql`UPDATE sites SET app_id = ${appId}, app_source = NULL, updated_at = now() WHERE id = ${siteId}`; // a hand-picked ID is never touched through the API
                 await audit(sql, me.id, 'set_app_id', siteId, { app_id: appId });
                 await logEvent(sql, siteId, appId ? 'app_id_assigned' : 'app_id_cleared', {});
                 return send(res, 200, { ok: true });
@@ -198,6 +234,10 @@ module.exports = async function handler(req, res) {
                 if (markup === null) return send(res, 400, { error: `Markup must be between ${S.MARKUP_MIN} and ${S.MARKUP_MAX}%.` });
                 const pooled = (await sql`SELECT markup_percent FROM app_pool WHERE site_id = ${siteId} LIMIT 1`)[0];
                 if (pooled && Number(pooled.markup_percent) !== markup) return send(res, 400, { error: `This site uses a pre-made app with ${Number(pooled.markup_percent)}% markup. Assign a different App ID instead.` });
+                if (site.app_id && site.app_source === 'api' && markup !== Number(site.markup_percent)) {
+                    try { await syncAppToDeriv(sql, site, { markup_percent: markup }); }
+                    catch (err) { return send(res, 502, { error: `Deriv did not accept the change, so nothing was changed: ${reasonOf(err)}` }); }
+                }
                 await sql`UPDATE sites SET markup_percent = ${markup}, updated_at = now() WHERE id = ${siteId}`;
                 await audit(sql, me.id, 'set_markup', siteId, { markup_percent: markup });
                 await logEvent(sql, siteId, 'markup_confirmed', { markup_percent: markup });
