@@ -241,7 +241,7 @@
         var card = el('div', { class: 'card' }, [
             el('div', { class: 'row between' }, [el('h2', { text: site.name }), el('div', { class: 'row' }, [pill(site.status, site.status), pill(site.plan === 'free' ? 'Free address' : 'Own domain')])]),
             el('p', { class: 'muted', style: 'margin:2px 0 10px' }, [site.domain]),
-            el('p', { style: 'margin:0 0 12px' }, ['You receive ', el('b', { text: site.operator_share + '%' }), ' of commission; the platform keeps ', site.platform_share + '%.']),
+            el('p', { style: 'margin:0 0 12px' }, ['You receive ', el('b', { text: site.operator_share + '%' }), ' of commission.']),
         ]);
         card.appendChild(el('p', { style: 'margin:0 0 12px' }, ['Markup ', el('b', { text: Number(site.markup_percent).toFixed(2) + '%' }), ' \u00b7 App ID ', site.app_id ? el('b', { text: site.app_id }) : pill('Awaiting assignment', 'pending')]));
         if (!site.app_id) card.appendChild(el('div', { class: 'notice', text: 'We are setting up your own Deriv app for this site. Your earnings are tracked separately once your App ID is assigned, and we will show it here.' }));
@@ -256,19 +256,23 @@
         return v;
     }
 
-    function markupField(initial) {
-        var input = el('input', { name: 'markup_percent', type: 'text', inputmode: 'decimal', autocomplete: 'off', 'aria-label': 'Markup percentage' });
+    // Markup picker: buttons only (steps of 0.5%), so values land on the tiers you stock apps for.
+    function markupField(initial, locked, note) {
+        var input = el('input', { name: 'markup_percent', type: 'text', readonly: 'readonly', autocomplete: 'off', 'aria-label': 'Markup percentage' });
         input.value = Number(initial).toFixed(2);
         var err = el('div', { class: 'err' });
-        function clamp(n) { return Math.min(3, Math.max(1, Math.round(n * 100) / 100)); }
+        function clamp(n) { return Math.min(3, Math.max(1, Math.round(n * 2) / 2)); }
         function bump(d) { var n = parseFloat(input.value); if (!isFinite(n)) n = 1; input.value = clamp(n + d).toFixed(2); err.textContent = ''; }
-        var minus = el('button', { type: 'button', class: 'stepbtn', 'aria-label': 'Decrease markup', text: '\u2212', onclick: function () { bump(-0.1); } });
-        var plus = el('button', { type: 'button', class: 'stepbtn', 'aria-label': 'Increase markup', text: '+', onclick: function () { bump(0.1); } });
-        input.addEventListener('blur', function () { var n = parseFloat(input.value); if (isFinite(n)) input.value = clamp(n).toFixed(2); });
+        var minus = el('button', { type: 'button', class: 'stepbtn', 'aria-label': 'Decrease markup', text: '−', onclick: function () { bump(-0.5); } });
+        var plus = el('button', { type: 'button', class: 'stepbtn', 'aria-label': 'Increase markup', text: '+', onclick: function () { bump(0.5); } });
+        if (locked) { minus.disabled = true; plus.disabled = true; }
+        var hint = locked
+            ? 'Your markup is fixed by your Deriv app. Contact support if you want it changed.'
+            : 'The extra percentage added on your clients’ trades, from 1 to 3%. It is what earns commission. A higher markup earns more but makes trading costlier for your clients. Use the buttons to change it in steps of 0.5%.' + (note ? ' ' + note : '');
         var wrap = el('div', {}, [el('label', { text: 'Markup percentage' }),
             el('div', { class: 'stepper' }, [minus, input, el('span', { class: 'pct', text: '%' }), plus]),
-            el('div', { class: 'muted small', text: 'The extra percentage added on your clients\u2019 trades, between 1 and 3%. It is what earns commission. A higher markup earns more but makes trading costlier for your clients. You can change it any time; we then update it on your Deriv app.' }), err]);
-        return { wrap: wrap, input: input, setError: function (m) { err.textContent = m || ''; } };
+            el('div', { class: 'muted small', text: hint }), err]);
+        return { wrap: wrap, input: input, locked: !!locked, setError: function (m) { err.textContent = m || ''; } };
     }
 
     function siteForm(creating) {
@@ -283,9 +287,9 @@
         if (creating) {
             var free = el('input', { type: 'radio', name: 'plan', value: 'free', checked: 'checked', style: 'width:auto' });
             var cust = el('input', { type: 'radio', name: 'plan', value: 'custom', style: 'width:auto' });
-            var subF = field('subdomain', 'Free address (just the name, e.g. julias)', 'text', '', 'Live at once at <name>.' + root_ + '. The platform keeps 25% of commission and handles customer support.');
+            var subF = field('subdomain', 'Free address (just the name, e.g. julias)', 'text', '', 'Live at once at <name>.' + root_ + '. The platform handles customer support.');
             subF.input.setAttribute('placeholder', 'yourname');
-            var domF = field('custom_domain', 'Your own domain', 'text', '', 'e.g. trade.yourbrand.com. Needs approval. The platform keeps 15% and you set your own support contacts.');
+            var domF = field('custom_domain', 'Your own domain', 'text', '', 'e.g. trade.yourbrand.com. Needs approval. You set your own support contacts.');
             domF.wrap.classList.add('hidden');
             var flip = function () { isCustom = cust.checked; domF.wrap.classList.toggle('hidden', !isCustom); subF.wrap.classList.toggle('hidden', isCustom); contactBox.classList.toggle('hidden', !isCustom); };
             free.addEventListener('change', flip); cust.addEventListener('change', flip);
@@ -297,7 +301,7 @@
             v.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Your markup' }), mkF.wrap]));
         }
         if (!creating && site) {
-            var mkE = markupField(site.markup_percent); fields.markup_percent = mkE;
+            var mkE = markupField(site.markup_percent, site.markup_locked, site.app_id ? 'If you change it, our team updates it on your Deriv app.' : 'Your site gets its own Deriv app for the markup you pick.'); fields.markup_percent = mkE;
             v.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Markup and App ID' }), mkE.wrap,
                 el('p', { class: 'muted small', style: 'margin:12px 0 0', text: site.app_id ? 'Your App ID is ' + site.app_id + '.' : 'Your App ID has not been assigned yet.' })]));
         }
@@ -319,6 +323,7 @@
             var body = {}; Object.keys(fields).forEach(function (k) { body[k] = fields[k].input.value; });
             if (creating && !isCustom) delete body.custom_domain;
             if (creating && isCustom) delete body.subdomain;
+            if (!creating && fields.markup_percent && fields.markup_percent.locked) delete body.markup_percent;
             save.disabled = true; msg.textContent = '';
             api('/api/my-site', creating ? 'POST' : 'PUT', body).then(function (r) {
                 save.disabled = false; showFieldErrors(fields, r);
@@ -372,7 +377,7 @@
         if (cur === 'yours') {
             body.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Your address' }),
                 el('div', { class: 'row' }, [el('strong', { text: site.domain }), pill(site.status, site.status), pill(site.plan === 'free' ? 'Free address' : 'Own domain')]),
-                el('p', { class: 'muted small', text: site.plan === 'free' ? 'Free address: you keep 75% of commission and the platform handles support.' : 'Your own domain: you keep 85% of commission and you handle your own support.' })]));
+                el('p', { class: 'muted small', text: 'You keep ' + site.operator_share + '% of commission on this address. ' + (site.plan === 'free' ? 'The platform handles support.' : 'You handle your own support.') })]));
             if (site.plan !== 'free') body.appendChild(dnsInstructions(site.domain));
         }
 
@@ -382,7 +387,7 @@
                     body.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Own domain requested' }), el('p', {}, ['You asked to move to ', el('strong', { text: site.custom_domain_requested }), '. We activate it after review once the DNS record below is in place.'])]));
                     body.appendChild(dnsInstructions(site.custom_domain_requested));
                 } else {
-                    var d = field('domain', 'Your domain', 'text', '', 'e.g. trade.yourbrand.com. Moving to your own domain lowers the platform share to 15%.');
+                    var d = field('domain', 'Your domain', 'text', '', 'e.g. trade.yourbrand.com. Moving to your own domain raises your share of commission.');
                     var m = el('div', { class: 'err' });
                     body.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Connect a domain you already own' }), d.wrap,
                         el('button', { class: 'btn primary', text: 'Request my own domain', onclick: function () {
@@ -409,7 +414,7 @@
             }
             q.addEventListener('keydown', function (e) { if (e.key === 'Enter') search(); });
             body.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Find a domain' }),
-                el('p', { class: 'muted small', text: 'Search for a name, pick one, pay by M-Pesa, and we connect it to your site. Buying a domain moves you to the own-domain plan, where you keep 85% of commission.' }),
+                el('p', { class: 'muted small', text: 'Search for a name, pick one, pay by M-Pesa, and we connect it to your site. Buying a domain moves you to the own-domain plan, which has a higher share of commission.' }),
                 el('div', { class: 'row' }, [q, el('button', { class: 'btn primary', text: 'Search', onclick: search })]), out]));
             body.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'How buying will work' }),
                 el('ol', { class: 'muted small' }, [el('li', { text: 'Search a name and see the price.' }), el('li', { text: 'Pay by M-Pesa. Your payment is confirmed automatically.' }),
@@ -459,7 +464,7 @@
     var FAQ = [
         ['How do I create a site?', 'Open Sites, choose Create new site, pick a free address or your own domain, and add your branding. A free address goes live immediately.'],
         ['How do I connect my own domain?', 'Open Domains, enter your domain and send the request, then add the DNS record shown. We review and activate it, and the Deployments page shows the progress.'],
-        ['How is commission shared?', 'On a free address you receive 75% and the platform keeps 25%. On your own domain you receive 85% and the platform keeps 15%. Your current share is shown on the Sites page.'],
+        ['How is commission shared?', 'You receive 75% of commission on a free address and 85% on your own domain. Your current share is shown on the Sites page.'],
         ['When do I get paid?', 'Commission accrues through the month. After Deriv\u2019s monthly partner payment has been received and reconciled, your share is paid out. Earnings and withdrawals will appear under Commissions once they launch.'],
         ['Who supports my clients?', 'On a free address, the platform handles client support. On your own domain, you handle it with the contacts you set when editing your site.'],
         ['Is trading risky?', 'Yes. Trading on Deriv carries a high risk of loss and commission is not guaranteed. Never promise profits to your clients.'],

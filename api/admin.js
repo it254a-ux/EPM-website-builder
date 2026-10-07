@@ -2,6 +2,7 @@ const { getDb } = require('./_lib/db');
 const A = require('./_lib/auth');
 const S = require('./_lib/site-settings');
 const { logEvent } = require('./_lib/events');
+const { assignFromPool, assignWaiting } = require('./_lib/app-pool');
 
 const send = (res, code, body) => res.status(code).json(body);
 const n = v => (v === undefined ? null : v);
@@ -21,7 +22,7 @@ const audit = (sql, adminId, action, target, detail) =>
 //   3. state-changing calls must come from the same site (no cross-site posts)
 //
 //   GET  /api/admin?resource=sites | owners | audit
-//   POST /api/admin  { action: set_status | update_site | approve_custom | set_app_id | set_markup | set_rate | disable_owner | delete_site | delete_owner, ... }
+//   POST /api/admin  { action: set_status | update_site | approve_custom | set_app_id | set_markup | pool_add | pool_remove | assign_from_pool | set_rate | disable_owner | delete_site | delete_owner, ... }
 module.exports = async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store');
     if (!A.onPlatformHost(req, 'strict')) return send(res, 404, { error: 'Not found' });
@@ -46,6 +47,15 @@ module.exports = async function handler(req, res) {
                     ORDER BY s.created_at DESC LIMIT 500
                 `;
                 return send(res, 200, { sites: rows.map(r => ({ ...r, platform_share: effectiveShare(r) })) });
+            }
+            if (resource === 'pool') {
+                const tiers = await sql`
+                    SELECT markup_percent, count(*) FILTER (WHERE assigned_at IS NULL)::int AS free, count(*) FILTER (WHERE assigned_at IS NOT NULL)::int AS used
+                    FROM app_pool GROUP BY markup_percent ORDER BY markup_percent`;
+                const apps = await sql`
+                    SELECT p.id, p.app_id, p.markup_percent, p.assigned_at, s.domain AS site_domain
+                    FROM app_pool p LEFT JOIN sites s ON s.id = p.site_id ORDER BY p.id DESC LIMIT 300`;
+                return send(res, 200, { tiers: tiers.map(t => ({ ...t, markup_percent: Number(t.markup_percent) })), apps });
             }
             if (resource === 'owners') {
                 const rows = await sql`SELECT id, email, name, role, disabled, created_at FROM owners ORDER BY created_at DESC LIMIT 500`;
@@ -124,6 +134,47 @@ module.exports = async function handler(req, res) {
                 return send(res, 200, { ok: true });
             }
 
+            // Stock the pool: IDs of apps you made in Deriv, all with the same markup. Waiting sites get them straight away.
+            case 'pool_add': {
+                const markup = S.sanitizeMarkup(body.markup_percent);
+                if (markup === null) return send(res, 400, { error: `Markup must be between ${S.MARKUP_MIN} and ${S.MARKUP_MAX}%.` });
+                const ids = [...new Set(String(body.app_ids || '').split(/[\s,;]+/).filter(Boolean))];
+                if (!ids.length) return send(res, 400, { error: 'Paste at least one App ID.' });
+                if (ids.length > 200) return send(res, 400, { error: 'Add at most 200 App IDs at a time.' });
+                const bad = ids.filter(i => S.sanitizeAppId(i) === null);
+                if (bad.length) return send(res, 400, { error: `These are not valid App IDs (letters and numbers only): ${bad.slice(0, 5).join(', ')}` });
+                let added = 0;
+                for (const id of ids) {
+                    const r = await sql`
+                        INSERT INTO app_pool (app_id, markup_percent)
+                        SELECT ${id}, ${markup} WHERE NOT EXISTS (SELECT 1 FROM sites WHERE app_id = ${id})
+                        ON CONFLICT (app_id) DO NOTHING RETURNING id`;
+                    added += r.length;
+                }
+                const assigned = await assignWaiting(sql, markup);
+                await audit(sql, me.id, 'pool_add', markup, { added, skipped: ids.length - added, assigned });
+                return send(res, 200, { ok: true, added, skipped: ids.length - added, assigned });
+            }
+
+            // Only apps nobody has used can be removed.
+            case 'pool_remove': {
+                const r = await sql`DELETE FROM app_pool WHERE id = ${Number(body.pool_id)} AND assigned_at IS NULL RETURNING app_id`;
+                if (!r.length) return send(res, 400, { error: 'That app is already in use, or does not exist.' });
+                await audit(sql, me.id, 'pool_remove', r[0].app_id, {});
+                return send(res, 200, { ok: true });
+            }
+
+            // Try the pool for one waiting site (for example after changing its markup).
+            case 'assign_from_pool': {
+                const site = (await sql`SELECT id, app_id, markup_percent FROM sites WHERE id = ${siteId} LIMIT 1`)[0];
+                if (!site) return send(res, 404, { error: 'Site not found.' });
+                if (site.app_id) return send(res, 400, { error: 'This site already has an App ID.' });
+                const appId = await assignFromPool(sql, siteId, Number(site.markup_percent));
+                if (!appId) return send(res, 409, { error: `No unused app with ${Number(site.markup_percent)}% markup. Add some under App ID pool.` });
+                await audit(sql, me.id, 'assign_from_pool', siteId, { app_id: appId });
+                return send(res, 200, { ok: true, app_id: appId });
+            }
+
             // The Deriv app you created for this site. Blank clears it (back to "awaiting").
             case 'set_app_id': {
                 const site = await getSite();
@@ -131,6 +182,8 @@ module.exports = async function handler(req, res) {
                 const raw = String(body.app_id === undefined || body.app_id === null ? '' : body.app_id).trim();
                 const appId = raw === '' ? null : S.sanitizeAppId(raw);
                 if (raw !== '' && appId === null) return send(res, 400, { error: 'An App ID uses letters and numbers only.' });
+                // A hand-picked App ID replaces a pooled one: the pooled app is retired (never reused) and the markup is editable again.
+                await sql`UPDATE app_pool SET site_id = NULL WHERE site_id = ${siteId} AND app_id <> ${appId === null ? '' : appId}`;
                 await sql`UPDATE sites SET app_id = ${appId}, updated_at = now() WHERE id = ${siteId}`;
                 await audit(sql, me.id, 'set_app_id', siteId, { app_id: appId });
                 await logEvent(sql, siteId, appId ? 'app_id_assigned' : 'app_id_cleared', {});
@@ -143,6 +196,8 @@ module.exports = async function handler(req, res) {
                 if (!site) return send(res, 404, { error: 'Site not found.' });
                 const markup = S.sanitizeMarkup(body.markup_percent);
                 if (markup === null) return send(res, 400, { error: `Markup must be between ${S.MARKUP_MIN} and ${S.MARKUP_MAX}%.` });
+                const pooled = (await sql`SELECT markup_percent FROM app_pool WHERE site_id = ${siteId} LIMIT 1`)[0];
+                if (pooled && Number(pooled.markup_percent) !== markup) return send(res, 400, { error: `This site uses a pre-made app with ${Number(pooled.markup_percent)}% markup. Assign a different App ID instead.` });
                 await sql`UPDATE sites SET markup_percent = ${markup}, updated_at = now() WHERE id = ${siteId}`;
                 await audit(sql, me.id, 'set_markup', siteId, { markup_percent: markup });
                 await logEvent(sql, siteId, 'markup_confirmed', { markup_percent: markup });

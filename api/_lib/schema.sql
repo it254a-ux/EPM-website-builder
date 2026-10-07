@@ -87,3 +87,18 @@ CREATE INDEX IF NOT EXISTS site_events_site_idx ON site_events (site_id, id DESC
 -- app_id: the Deriv app the admin created for this site. NULL = still awaiting assignment.
 ALTER TABLE sites ADD COLUMN IF NOT EXISTS markup_percent NUMERIC(4,2) NOT NULL DEFAULT 1.00;
 ALTER TABLE sites ADD COLUMN IF NOT EXISTS app_id TEXT;
+
+-- ===== Pre-made Deriv apps, handed out automatically =====
+-- You create apps in Deriv by hand (one per site, each with its markup) and paste the IDs into the admin panel.
+-- When a site is created, it gets the next unused app with exactly its markup. Each app is used by ONE site only,
+-- so Deriv's markup report stays per site. An app is "free" while assigned_at IS NULL; once used it is never reused,
+-- even if the site is deleted (its history stays attached to that app).
+CREATE TABLE IF NOT EXISTS app_pool (
+    id             SERIAL PRIMARY KEY,
+    app_id         TEXT NOT NULL UNIQUE,
+    markup_percent NUMERIC(4,2) NOT NULL,
+    site_id        INTEGER REFERENCES sites(id) ON DELETE SET NULL,
+    assigned_at    TIMESTAMPTZ,
+    created_at     TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS app_pool_free_idx ON app_pool (markup_percent, id) WHERE assigned_at IS NULL;

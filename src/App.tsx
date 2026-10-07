@@ -439,12 +439,12 @@ function HowItWorksPage() {
           <article className="feature-card">
             <div className="feature-card-top"><span className="icon-box"><Rocket /></span><span className="feature-index">75%</span></div>
             <p className="feature-tag">START HERE</p><h2>Free address</h2>
-            <p>Live instantly at yourname.executiveprimemarkets.site. Full branding and the complete toolset, with customer support handled by EPM. You keep 75% of commission; EPM keeps 25%.</p>
+            <p>Live instantly at yourname.executiveprimemarkets.site. Full branding and the complete toolset, with customer support handled by EPM. You keep 75% of commission.</p>
           </article>
           <article className="feature-card">
             <div className="feature-card-top"><span className="icon-box"><Globe2 /></span><span className="feature-index">85%</span></div>
             <p className="feature-tag">FULL OWNERSHIP</p><h2>Your own domain</h2>
-            <p>Run on your own address, with your own WhatsApp, phone and email for client support. Reviewed and activated by our team. You keep 85% of commission; EPM keeps 15%.</p>
+            <p>Run on your own address, with your own WhatsApp, phone and email for client support. Reviewed and activated by our team. You keep 85% of commission.</p>
           </article>
         </div>
       </section>
@@ -498,7 +498,7 @@ function AboutPage() {
 }
 
 const faqs = [
-  { question: 'How is commission shared?', answer: 'Commission earned on your clients’ eligible trading activity is split between EPM and you. On a free address, EPM keeps 25% and you receive 75%. On your own domain, EPM keeps 15% and you receive 85%. For example, on a $10 commission pool with your own domain, that is $8.50 for you and $1.50 for EPM. Final terms are set out in your agreement.' },
+  { question: 'How is commission shared?', answer: 'Commission earned on your clients’ eligible trading activity is shared with you. You receive 75% on a free address and 85% on your own domain. For example, on a $10 commission pool with your own domain, that is $8.50 for you. Final terms are set out in your agreement.' },
   { question: 'When and how do I get paid?', answer: 'Commission accrues through the month. After Deriv’s monthly partner payment is received and reconciled by EPM, your share is paid out. Payout methods and timing are confirmed in your agreement.' },
   { question: 'How long does it take to launch?', answer: 'A free address goes live the moment you create it. An own-domain site is reviewed and activated by our team once the DNS record for your domain is in place.' },
   { question: 'Can I use my own domain?', answer: 'Yes. Choose your own domain when you sign up, or request it later from your dashboard. We will tell you exactly which DNS record to add.' },
@@ -568,8 +568,8 @@ const termsSections: LegalSection[] = [
   { title: 'Commission and how it is shared', paragraphs: [
     'The Platform earns commission from Deriv on eligible trading activity carried out through your site. We share that commission with you as follows, unless we agree a different rate with you in writing:',
   ], bullets: [
-    'Free address: you receive 75% and EPM keeps 25%.',
-    'Your own domain: you receive 85% and EPM keeps 15%.',
+    'Free address: you receive 75% of commission.',
+    'Your own domain: you receive 85% of commission.',
     'Your current rate is shown in your dashboard. If you move to your own domain, the new rate applies only from the date the change takes effect; earlier activity stays at the earlier rate.',
     'We may change the standard rates for future activity by giving you reasonable notice.',
     'Commission depends on Deriv’s reports and payments and on your clients’ trading activity. We do not guarantee that any commission will be earned. Where Deriv adjusts, reverses or withholds commission, we may adjust your share to match.',
@@ -1017,8 +1017,6 @@ function CommissionsPage() {
         <div className="split-example">
           <div><small>Total commission pool</small><b>$10.00 · 100%</b></div>
           <span>→</span>
-          <div><small>EPM platform share</small><b>$1.50 · 15%</b></div>
-          <span>+</span>
           <div><small>Your site-owner share</small><b>$8.50 · 85%</b></div>
         </div>
         <span className="demo-warning"><ShieldCheck size={15} /> Preview only: trade attribution, accrued balances, monthly reconciliation, and payouts are not connected.</span>

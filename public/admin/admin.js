@@ -34,7 +34,7 @@
         return el('div', { class: 'scroll' }, [t]);
     }
 
-    function render(sites, owners) {
+    function render(sites, owners, pool) {
         clear();
         app.appendChild(el('div', { class: 'row', style: 'justify-content:space-between' }, [
             el('span', { class: 'muted', text: sites.length + ' sites · ' + owners.length + ' accounts' }),
@@ -45,7 +45,8 @@
             if (s.status !== 'active') btns.appendChild(el('button', { text: 'Approve', onclick: function () { act({ action: 'set_status', site_id: s.id, status: 'active' }); } }));
             if (s.status !== 'suspended') btns.appendChild(el('button', { text: 'Suspend', onclick: function () { act({ action: 'set_status', site_id: s.id, status: 'suspended' }); } }));
             if (s.custom_domain_requested) btns.appendChild(el('button', { text: 'Approve ' + s.custom_domain_requested, onclick: function () {
-                if (confirm('Add ' + s.custom_domain_requested + ' to Vercel and your Deriv redirect list first. Switch the site now?')) act({ action: 'approve_custom', site_id: s.id }); } }));
+                if (confirm('Add ' + s.custom_domain_requested + ' to Vercel and to the redirect list of its Deriv app' + (s.app_id ? ' (' + s.app_id + ')' : '') + ' first. Switch the site now?')) act({ action: 'approve_custom', site_id: s.id }); } }));
+            if (!s.app_id) btns.appendChild(el('button', { text: 'Take from pool', onclick: function () { act({ action: 'assign_from_pool', site_id: s.id }); } }));
             btns.appendChild(el('button', { text: s.app_id ? 'Change App ID' : 'Assign App ID', onclick: function () {
                 var v = prompt('Deriv App ID for ' + s.name + ' (create the app in Deriv first, with ' + s.markup_percent + '% markup). Leave blank to clear.', s.app_id || '');
                 if (v === null) return; act({ action: 'set_app_id', site_id: s.id, app_id: v.trim() }); } }));
@@ -61,6 +62,31 @@
         });
         app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Sites' }), table(['Name', 'Domain', 'Plan', 'Status', 'You keep', 'Markup', 'App ID', 'Owner', 'Actions'], siteRows)]));
 
+        // ----- App ID pool -----
+        var waitingBy = {};
+        sites.forEach(function (s) { if (!s.app_id) waitingBy[Number(s.markup_percent)] = (waitingBy[Number(s.markup_percent)] || 0) + 1; });
+        var tierMap = {};
+        (pool.tiers || []).forEach(function (t) { tierMap[Number(t.markup_percent)] = t; });
+        [1, 1.5, 2, 2.5, 3].forEach(function (m) { if (!tierMap[m]) tierMap[m] = { markup_percent: m, free: 0, used: 0 }; });
+        Object.keys(waitingBy).forEach(function (m) { if (!tierMap[Number(m)]) tierMap[Number(m)] = { markup_percent: Number(m), free: 0, used: 0 }; });
+        var tierRows = Object.keys(tierMap).map(Number).sort(function (a, b) { return a - b; }).map(function (m) {
+            var t = tierMap[m], w = waitingBy[m] || 0;
+            return [m.toFixed(2) + '%', String(t.free), String(t.used), w ? el('span', { class: 'pill', text: w + ' waiting' }) : '0'];
+        });
+        var tierSel = el('select', {}, [1, 1.5, 2, 2.5, 3].map(function (m) { return el('option', { value: String(m), text: m.toFixed(2) + '% markup' }); }));
+        var idsBox = el('textarea', { rows: '4', placeholder: 'Paste the App IDs of apps you made in Deriv with this markup. One per line, or separated by commas.' });
+        var poolMsg = el('div', { class: 'muted' });
+        var addBtn = el('button', { class: 'primary', text: 'Add to pool', onclick: function () {
+            poolMsg.textContent = ''; addBtn.disabled = true;
+            api('/api/admin', 'POST', { action: 'pool_add', markup_percent: tierSel.value, app_ids: idsBox.value }).then(function (r) {
+                addBtn.disabled = false;
+                if (r.error) { poolMsg.textContent = r.error; return; }
+                alert('Added ' + r.added + (r.skipped ? ', skipped ' + r.skipped + ' (already known)' : '') + (r.assigned ? '. ' + r.assigned + ' waiting site(s) got an App ID.' : '.')); load(); }); } });
+        app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'App ID pool' }),
+            el('p', { class: 'muted', text: 'Create apps in Deriv by hand (one per future site, each with its markup and your main-domain redirect URL), then paste their IDs here. New sites take the next unused app with their exact markup, one site per app. Sites wait as "awaiting App ID" when a tier runs out.' }),
+            table(['Markup', 'Free', 'Used', 'Sites waiting'], tierRows),
+            el('div', { style: 'height:10px' }), tierSel, el('div', { style: 'height:8px' }), idsBox, el('div', { class: 'row', style: 'margin-top:8px' }, [addBtn, poolMsg])]));
+
         var ownerRows = owners.map(function (o) {
             var b = o.role === 'operator' ? el('div', { class: 'row' }, [
                 el('button', { text: o.disabled ? 'Enable' : 'Disable', onclick: function () { act({ action: 'disable_owner', owner_id: o.id, disabled: !o.disabled }); } }),
@@ -73,11 +99,11 @@
     }
 
     function load() {
-        Promise.all([api('/api/admin?resource=sites'), api('/api/admin?resource=owners')]).then(function (r) {
+        Promise.all([api('/api/admin?resource=sites'), api('/api/admin?resource=owners'), api('/api/admin?resource=pool')]).then(function (r) {
             if (r[0].__status === 401) return login();
             if (r[0].__status === 403) { clear(); app.appendChild(el('p', { class: 'err', text: 'This account is not an admin.' })); return; }
             if (r[0].__status === 404) { clear(); app.appendChild(el('p', { class: 'err', text: 'Admin is not available on this domain.' })); return; }
-            render(r[0].sites || [], r[1].owners || []);
+            render(r[0].sites || [], r[1].owners || [], r[2] && !r[2].error ? r[2] : { tiers: [], apps: [] });
         });
     }
     load();

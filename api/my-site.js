@@ -3,6 +3,7 @@ const A = require('./_lib/auth');
 const S = require('./_lib/site-settings');
 const { logEvent, listEvents } = require('./_lib/events');
 const { checkDomain } = require('./_lib/dns-check');
+const { tryAssign } = require('./_lib/app-pool');
 
 const send = (res, code, body) => res.status(code).json(body);
 const n = v => (v === undefined ? null : v);
@@ -22,7 +23,7 @@ const view = row => ({
     markup_percent: row.markup_percent === null || row.markup_percent === undefined ? S.MARKUP_DEFAULT : Number(row.markup_percent),
     app_id: row.app_id || '',
     app_status: row.app_id ? 'assigned' : 'awaiting',
-    platform_share: effectiveShare(row),          // % the platform keeps
+    markup_locked: !!row.app_pooled,              // the pre-made Deriv app fixes the markup
     operator_share: 100 - effectiveShare(row),    // % the operator receives
 });
 
@@ -30,7 +31,8 @@ const findOwn = async (sql, ownerId) =>
     (await sql`
         SELECT id, domain, name, plan, status, primary_color, font, logo_url, about, vision, mission,
                whatsapp, phone, support_email, telegram, custom_domain_requested, commission_rate_override,
-               markup_percent, app_id
+               markup_percent, app_id,
+               EXISTS (SELECT 1 FROM app_pool p WHERE p.site_id = sites.id) AS app_pooled
         FROM sites WHERE owner_id = ${ownerId} LIMIT 1
     `)[0] || null;
 
@@ -135,6 +137,7 @@ module.exports = async function handler(req, res) {
             }
             await sql`INSERT INTO site_rate_history (site_id, plan, platform_share) VALUES (${created.id}, ${plan}, ${S.PLAN_SHARE[plan]})`;
             await logEvent(sql, created.id, 'site_created', { plan, domain, status, markup_percent: markup });
+            await tryAssign(sql, created.id, markup); // picks the next unused pre-made Deriv app for this markup, if you have stocked one
             return send(res, 201, { site: view(await findOwn(sql, me.id)) });
         }
 
@@ -162,6 +165,8 @@ module.exports = async function handler(req, res) {
             newMarkup = S.sanitizeMarkup(body.markup_percent);
             if (newMarkup === null) editErrors.markup_percent = `Enter a markup between ${S.MARKUP_MIN} and ${S.MARKUP_MAX}%.`;
         }
+        const oldMarkup = row.markup_percent === null || row.markup_percent === undefined ? S.MARKUP_DEFAULT : Number(row.markup_percent);
+        if (newMarkup !== null && newMarkup !== oldMarkup && row.app_pooled) editErrors.markup_percent = 'Your markup is fixed by your Deriv app. Contact support to change it.';
         if (Object.keys(editErrors).length) return send(res, 400, { error: 'Please fix the highlighted fields.', fields: editErrors });
         const v = checked.value;
         await sql`
@@ -181,8 +186,10 @@ module.exports = async function handler(req, res) {
                 updated_at = now()
             WHERE id = ${row.id} AND owner_id = ${me.id}
         `;
-        const oldMarkup = row.markup_percent === null || row.markup_percent === undefined ? S.MARKUP_DEFAULT : Number(row.markup_percent);
-        if (newMarkup !== null && newMarkup !== oldMarkup) await logEvent(sql, row.id, 'markup_changed', { from: oldMarkup, to: newMarkup });
+        if (newMarkup !== null && newMarkup !== oldMarkup) {
+            await logEvent(sql, row.id, 'markup_changed', { from: oldMarkup, to: newMarkup });
+            if (!row.app_id) await tryAssign(sql, row.id, newMarkup); // still waiting: the new markup may match a stocked app
+        }
         await logEvent(sql, row.id, 'details_updated', {});
         return send(res, 200, { site: view(await findOwn(sql, me.id)) });
     } catch (err) {
