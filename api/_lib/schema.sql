@@ -67,7 +67,7 @@ CREATE TABLE IF NOT EXISTS site_rate_history (
     id             SERIAL PRIMARY KEY,
     site_id        INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
     plan           TEXT NOT NULL,
-    platform_share NUMERIC(5,2) NOT NULL,          -- e.g. 25.00 or 15.00
+    platform_share NUMERIC(5,2) NOT NULL,          -- percent the platform keeps
     effective_from TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS site_rate_history_site_idx ON site_rate_history (site_id, effective_from);

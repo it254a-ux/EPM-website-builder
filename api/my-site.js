@@ -8,11 +8,6 @@ const { tryAssign } = require('./_lib/app-pool');
 const send = (res, code, body) => res.status(code).json(body);
 const n = v => (v === undefined ? null : v);
 
-const effectiveShare = row =>
-    row.commission_rate_override !== null && row.commission_rate_override !== undefined
-        ? Number(row.commission_rate_override)
-        : S.PLAN_SHARE[row.plan];
-
 // What an operator may see about THEIR OWN site (never anyone else's data).
 const view = row => ({
     id: row.id, domain: row.domain, name: row.name, plan: row.plan, status: row.status,
@@ -24,7 +19,6 @@ const view = row => ({
     app_id: row.app_id || '',
     app_status: row.app_id ? 'assigned' : 'awaiting',
     markup_locked: !!row.app_pooled,              // the pre-made Deriv app fixes the markup
-    operator_share: 100 - effectiveShare(row),    // % the operator receives
 });
 
 const findOwn = async (sql, ownerId) =>

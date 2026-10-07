@@ -302,7 +302,7 @@ function HomePage() {
           <p className="hero-description">
             Launch a branded trading site in minutes. Choose your name, logo and
             colours, give your clients the complete Deriv bot builder and analysis
-            tools, and keep up to 85% of the commission your platform generates.
+            tools, and earn commission on the trading your platform generates.
           </p>
           <div className="hero-actions">
             <a className="button button-gradient button-large" href={OWNER_URL}>
@@ -402,8 +402,8 @@ function Stats() {
   return (
     <section className="stats-band">
       <div className="stats-inner">
-        <div><b>75%</b><span>Your share on a free address</span></div>
-        <div><b>85%</b><span>Your share on your own domain</span></div>
+        <div><b>Your brand</b><span>Name, logo, colours and typeface</span></div>
+        <div><b>Monthly</b><span>Commission paid after Deriv pays EPM</span></div>
         <div><b>Instant</b><span>Free sites go live on creation</span></div>
       </div>
     </section>
@@ -437,14 +437,14 @@ function HowItWorksPage() {
         <div className="values-heading"><p className="eyebrow">CHOOSE YOUR LAUNCH</p><h2>Two ways to go live</h2></div>
         <div className="plans-grid">
           <article className="feature-card">
-            <div className="feature-card-top"><span className="icon-box"><Rocket /></span><span className="feature-index">75%</span></div>
+            <div className="feature-card-top"><span className="icon-box"><Rocket /></span><span className="feature-index">01</span></div>
             <p className="feature-tag">START HERE</p><h2>Free address</h2>
-            <p>Live instantly at yourname.executiveprimemarkets.site. Full branding and the complete toolset, with customer support handled by EPM. You keep 75% of commission.</p>
+            <p>Live instantly at yourname.executiveprimemarkets.site. Full branding and the complete toolset, with customer support handled by EPM.</p>
           </article>
           <article className="feature-card">
-            <div className="feature-card-top"><span className="icon-box"><Globe2 /></span><span className="feature-index">85%</span></div>
+            <div className="feature-card-top"><span className="icon-box"><Globe2 /></span><span className="feature-index">02</span></div>
             <p className="feature-tag">FULL OWNERSHIP</p><h2>Your own domain</h2>
-            <p>Run on your own address, with your own WhatsApp, phone and email for client support. Reviewed and activated by our team. You keep 85% of commission.</p>
+            <p>Run on your own address, with your own WhatsApp, phone and email for client support. Reviewed and activated by our team.</p>
           </article>
         </div>
       </section>
@@ -458,7 +458,7 @@ const features = [
   { icon: <Bot />, title: 'Visual bot builder', text: 'A drag-and-drop builder for Deriv trading bots, with stop-loss, take-profit and flexible trade logic.', tag: 'BUILD STRATEGIES' },
   { icon: <BarChart3 />, title: 'Market analysis', text: 'An analysis tool that tracks live market data and digit statistics so clients can study conditions before they trade. It informs decisions; it does not predict outcomes.', tag: 'MARKET INSIGHTS' },
   { icon: <Blocks />, title: 'Strategy library', text: 'A growing library of ready-made bots your clients can browse and load in a click, managed centrally by EPM.', tag: 'START FASTER' },
-  { icon: <Wallet />, title: 'Transparent commission', text: 'A fixed split agreed in advance: 75% to you on a free address, 85% on your own domain, paid out monthly.', tag: 'CLEAR TERMS' },
+  { icon: <Wallet />, title: 'Agreed in advance', text: 'Your commission share is agreed before you start and set out in your agreement, then paid out monthly.', tag: 'CLEAR TERMS' },
   { icon: <Globe2 />, title: 'Your own domain', text: 'Move to your own address whenever you are ready. We tell you the exact DNS record to add and activate the site after review.', tag: 'YOUR ADDRESS' },
 ];
 
@@ -484,7 +484,7 @@ function AboutPage() {
     <PageWrap eyebrow="ABOUT EPM" title="Trading technology, packaged for platform owners." intro="Executive Prime Markets gives entrepreneurs and communities a ready-built way to run their own Deriv-powered trading platform." className="about-page">
       <section className="mission-layout">
         <div className="mission-copy"><span className="icon-box"><Rocket /></span><p className="eyebrow">OUR MISSION</p><h2>Make owning a trading platform straightforward.</h2><p>Building trading software from scratch takes a team and a budget. EPM removes that barrier: you launch under your own brand on infrastructure that already works, and focus on serving your clients.</p><p>Branding controls, a visual bot builder, market analysis tools, a strategy library and transparent commission terms are all part of the platform.</p></div>
-        <div className="mission-stat"><span className="icon-box"><Users /></span><b>85%</b><span>Your share on your own domain</span><div className="stat-progress"><i /></div><small>Commission split</small></div>
+        <div className="mission-stat"><span className="icon-box"><Users /></span><b>Monthly</b><span>Commission payouts</span><div className="stat-progress"><i /></div><small>Paid after Deriv pays EPM</small></div>
       </section>
       <div className="values-heading"><p className="eyebrow">OUR PRINCIPLES</p><h2>The principles we work by</h2></div>
       <div className="values-grid">
@@ -498,7 +498,7 @@ function AboutPage() {
 }
 
 const faqs = [
-  { question: 'How is commission shared?', answer: 'Commission earned on your clients’ eligible trading activity is shared with you. You receive 75% on a free address and 85% on your own domain. For example, on a $10 commission pool with your own domain, that is $8.50 for you. Final terms are set out in your agreement.' },
+  { question: 'How is commission shared?', answer: 'Commission earned on your clients’ eligible trading activity is shared with you at the rate set out in your agreement. Final terms are set out in your agreement.' },
   { question: 'When and how do I get paid?', answer: 'Commission accrues through the month. After Deriv’s monthly partner payment is received and reconciled by EPM, your share is paid out. Payout methods and timing are confirmed in your agreement.' },
   { question: 'How long does it take to launch?', answer: 'A free address goes live the moment you create it. An own-domain site is reviewed and activated by our team once the DNS record for your domain is in place.' },
   { question: 'Can I use my own domain?', answer: 'Yes. Choose your own domain when you sign up, or request it later from your dashboard. We will tell you exactly which DNS record to add.' },
@@ -566,11 +566,9 @@ const termsSections: LegalSection[] = [
     'You may request to move from a free address to your own domain from your dashboard. The change takes effect when we approve it.',
   ] },
   { title: 'Commission and how it is shared', paragraphs: [
-    'The Platform earns commission from Deriv on eligible trading activity carried out through your site. We share that commission with you as follows, unless we agree a different rate with you in writing:',
+    'The Platform earns commission from Deriv on eligible trading activity carried out through your site. We share that commission with you at the rate set out in your agreement with us, or confirmed to you in writing, as follows:',
   ], bullets: [
-    'Free address: you receive 75% of commission.',
-    'Your own domain: you receive 85% of commission.',
-    'Your current rate is shown in your dashboard. If you move to your own domain, the new rate applies only from the date the change takes effect; earlier activity stays at the earlier rate.',
+    'Your rate depends on your plan. If you move to your own domain, the new rate applies only from the date the change takes effect; earlier activity stays at the earlier rate.',
     'We may change the standard rates for future activity by giving you reasonable notice.',
     'Commission depends on Deriv’s reports and payments and on your clients’ trading activity. We do not guarantee that any commission will be earned. Where Deriv adjusts, reverses or withholds commission, we may adjust your share to match.',
   ] },
@@ -997,8 +995,8 @@ function CommissionsPage() {
         </button>
       </div>
       <div className="dashboard-kpi-grid">
-        <KpiCard icon={<Wallet />} label="Your accrued share" value="$0.00" note="85% of eligible commission attributed to your site" trend="neutral" />
-        <KpiCard icon={<TrendingUp />} label="Your share of commission pool" value="85%" note="Illustrative owner rate; final terms must be agreed" trend="neutral" />
+        <KpiCard icon={<Wallet />} label="Your accrued share" value="$0.00" note="Your share of eligible commission attributed to your site" trend="neutral" />
+        <KpiCard icon={<TrendingUp />} label="Your share of commission pool" value="Agreed" note="Set out in your agreement" trend="neutral" />
         <KpiCard icon={<CreditCard />} label="Next settlement" value="Monthly" note="Paid after the platform operator receives Deriv’s payout" trend="neutral" />
         <KpiCard icon={<Users />} label="Previous payouts" value="$0.00" note="No payments recorded in this preview" trend="neutral" />
       </div>
@@ -1006,18 +1004,13 @@ function CommissionsPage() {
         <span className="icon-box"><Wallet /></span>
         <p className="eyebrow">MONTHLY SETTLEMENT FLOW</p>
         <h2>Your eligible trade activity adds up during the month.</h2>
-        <p>The generated commission is treated as a 100% pool. EPM receives the monthly partner payment, reconciles activity for your site, and pays your 85% share. Your site account does not show the operator’s Deriv account or administrative controls.</p>
+        <p>The generated commission is treated as a 100% pool. EPM receives the monthly partner payment, reconciles activity for your site, and pays your agreed share. Your site account does not show the operator’s Deriv account or administrative controls.</p>
         <div className="settlement-steps">
           <div><span>01</span><b>Eligible trade</b><small>Activity is attributed to your site</small></div>
           <ArrowRight size={17} />
           <div><span>02</span><b>Monthly payout</b><small>Deriv pays the platform operator</small></div>
           <ArrowRight size={17} />
           <div><span>03</span><b>Your settlement</b><small>Your agreed share is paid to you</small></div>
-        </div>
-        <div className="split-example">
-          <div><small>Total commission pool</small><b>$10.00 · 100%</b></div>
-          <span>→</span>
-          <div><small>Your site-owner share</small><b>$8.50 · 85%</b></div>
         </div>
         <span className="demo-warning"><ShieldCheck size={15} /> Preview only: trade attribution, accrued balances, monthly reconciliation, and payouts are not connected.</span>
       </section>

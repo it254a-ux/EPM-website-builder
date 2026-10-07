@@ -27,16 +27,12 @@ The preview runs at `http://localhost:4003`. Run `npm run type-check` and
 - A public-facing branded site preview at `/p/<site-name>`. The preview does
   not expose the site owner's workspace, the operator's partner account, or
   platform-admin controls.
-- A site-owner commission view that illustrates a 100% commission pool split:
-  15% to EPM and 85% to the site owner. For an illustrative $10 pool, that is
-  $1.50 and $8.50 respectively.
+- A site-owner commission view (illustrative only, no real figures).
 
 ## Business flow to implement in the backend
 
-The intended example treats all commission generated for eligible activity as
-a 100% pool. EPM's proposed share is 15% and the site owner's proposed share is
-85%. For a $10 pool, EPM keeps $1.50 and the site owner receives $8.50.
-Eligible activity accrues during the month and is attributed to the platform
+All commission generated for eligible activity is treated as a pool that is
+split between EPM and the site owner under their agreement. Eligible activity accrues during the month and is attributed to the platform
 operator's Deriv partner account. Deriv pays the operator monthly; after that
 payment is reconciled, the operator settles the site owner's agreed share.
 Rates and eligibility rules must match the actual partner and site-owner
@@ -61,5 +57,5 @@ Before production, implement and test:
 - Domain verification and isolated site deployment.
 - Reviewed privacy, service, trading-risk, and commission disclosures.
 
-The 100% / 15% / 85% figures in the UI are illustrative and are not a promise
-of Deriv's terms, earnings, or payout timing.
+Any figures in the UI are illustrative and are not a promise of Deriv's
+terms, earnings, or payout timing.

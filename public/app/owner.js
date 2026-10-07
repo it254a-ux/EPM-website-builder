@@ -150,7 +150,7 @@
             el('h1', {}, ['Your own Deriv trading platform, ', el('span', { text: 'under your brand.' })]),
             el('p', { text: 'Create your account, brand your site and go live in minutes. Free to start, no coding required.' }),
             el('ul', {}, [el('li', { text: 'Free address live the moment you create it' }), el('li', { text: 'Your name, logo, colours and typeface' }),
-                el('li', { text: 'Keep up to 85% of commission' })]),
+                el('li', { text: 'Earn commission on your clients\u2019 trading' })]),
         ]);
         var googleBlock = null;
         if (S.google) {
@@ -201,7 +201,7 @@
         var views = {
             'sites': sitesView, 'sites/new': function () { return siteForm(true); }, 'sites/edit': function () { return siteForm(false); },
             'domains': domainsView, 'deployments': deploymentsView, 'support': supportView, 'settings': settingsView,
-            'commissions': function () { return soon('Revenue streams', 'Commissions', 'Your earnings, history and withdrawals will appear here once commission tracking launches. Your agreed share is shown on the Sites page.'); },
+            'commissions': function () { return soon('Revenue streams', 'Commissions', 'Your earnings, history and withdrawals will appear here once commission tracking launches. Your agreed share is set out in your agreement with EPM.'); },
             'bots': function () { return soon('Algorithm marketplace', 'Trading bots', 'Browse the central bot library and upload your own bots for your site. Coming soon.'); },
             'strategies': function () { return soon('Algorithm marketplace', 'Strategies', 'Upload strategy documents for your clients to download. Coming soon.'); },
         };
@@ -241,7 +241,6 @@
         var card = el('div', { class: 'card' }, [
             el('div', { class: 'row between' }, [el('h2', { text: site.name }), el('div', { class: 'row' }, [pill(site.status, site.status), pill(site.plan === 'free' ? 'Free address' : 'Own domain')])]),
             el('p', { class: 'muted', style: 'margin:2px 0 10px' }, [site.domain]),
-            el('p', { style: 'margin:0 0 12px' }, ['You receive ', el('b', { text: site.operator_share + '%' }), ' of commission.']),
         ]);
         card.appendChild(el('p', { style: 'margin:0 0 12px' }, ['Markup ', el('b', { text: Number(site.markup_percent).toFixed(2) + '%' }), ' \u00b7 App ID ', site.app_id ? el('b', { text: site.app_id }) : pill('Awaiting assignment', 'pending')]));
         if (!site.app_id) card.appendChild(el('div', { class: 'notice', text: 'We are setting up your own Deriv app for this site. Your earnings are tracked separately once your App ID is assigned, and we will show it here.' }));
@@ -377,7 +376,7 @@
         if (cur === 'yours') {
             body.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Your address' }),
                 el('div', { class: 'row' }, [el('strong', { text: site.domain }), pill(site.status, site.status), pill(site.plan === 'free' ? 'Free address' : 'Own domain')]),
-                el('p', { class: 'muted small', text: 'You keep ' + site.operator_share + '% of commission on this address. ' + (site.plan === 'free' ? 'The platform handles support.' : 'You handle your own support.') })]));
+                el('p', { class: 'muted small', text: site.plan === 'free' ? 'The platform handles support for your clients.' : 'You handle support for your own clients.' })]));
             if (site.plan !== 'free') body.appendChild(dnsInstructions(site.domain));
         }
 
@@ -387,7 +386,7 @@
                     body.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Own domain requested' }), el('p', {}, ['You asked to move to ', el('strong', { text: site.custom_domain_requested }), '. We activate it after review once the DNS record below is in place.'])]));
                     body.appendChild(dnsInstructions(site.custom_domain_requested));
                 } else {
-                    var d = field('domain', 'Your domain', 'text', '', 'e.g. trade.yourbrand.com. Moving to your own domain raises your share of commission.');
+                    var d = field('domain', 'Your domain', 'text', '', 'e.g. trade.yourbrand.com. Moving to your own domain needs our approval.');
                     var m = el('div', { class: 'err' });
                     body.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Connect a domain you already own' }), d.wrap,
                         el('button', { class: 'btn primary', text: 'Request my own domain', onclick: function () {
@@ -414,7 +413,7 @@
             }
             q.addEventListener('keydown', function (e) { if (e.key === 'Enter') search(); });
             body.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Find a domain' }),
-                el('p', { class: 'muted small', text: 'Search for a name, pick one, pay by M-Pesa, and we connect it to your site. Buying a domain moves you to the own-domain plan, which has a higher share of commission.' }),
+                el('p', { class: 'muted small', text: 'Search for a name, pick one, pay by M-Pesa, and we connect it to your site. Buying a domain moves you to the own-domain plan.' }),
                 el('div', { class: 'row' }, [q, el('button', { class: 'btn primary', text: 'Search', onclick: search })]), out]));
             body.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'How buying will work' }),
                 el('ol', { class: 'muted small' }, [el('li', { text: 'Search a name and see the price.' }), el('li', { text: 'Pay by M-Pesa. Your payment is confirmed automatically.' }),
@@ -464,7 +463,7 @@
     var FAQ = [
         ['How do I create a site?', 'Open Sites, choose Create new site, pick a free address or your own domain, and add your branding. A free address goes live immediately.'],
         ['How do I connect my own domain?', 'Open Domains, enter your domain and send the request, then add the DNS record shown. We review and activate it, and the Deployments page shows the progress.'],
-        ['How is commission shared?', 'You receive 75% of commission on a free address and 85% on your own domain. Your current share is shown on the Sites page.'],
+        ['How is commission shared?', 'Your share of commission is set out in your agreement with EPM. If you are unsure of it, ask us on WhatsApp.'],
         ['When do I get paid?', 'Commission accrues through the month. After Deriv\u2019s monthly partner payment has been received and reconciled, your share is paid out. Earnings and withdrawals will appear under Commissions once they launch.'],
         ['Who supports my clients?', 'On a free address, the platform handles client support. On your own domain, you handle it with the contacts you set when editing your site.'],
         ['Is trading risky?', 'Yes. Trading on Deriv carries a high risk of loss and commission is not guaranteed. Never promise profits to your clients.'],
