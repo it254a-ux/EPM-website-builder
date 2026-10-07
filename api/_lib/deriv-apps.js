@@ -1,9 +1,12 @@
-// Creates and updates the Deriv app of a site with YOUR admin-scope token, so nobody has to make apps by hand.
-// Uses Deriv's WebSocket API: authorize with the token, then app_register (new site) or app_update (markup / redirect change).
-// Docs: https://developers.deriv.com/docs/application-apis
+// OPTIONAL and OFF by default. Creates and updates the Deriv app of a site with an admin-scope token.
+// It speaks Deriv's OLDER WebSocket API (authorize, then app_register / app_update). Deriv's current API
+// (api.derivws.com) documents no way to create or change apps, so on the current platform apps are made in the
+// Deriv dashboard and handed out from the App ID pool (api/_lib/app-pool.js). Switch this on only if Deriv
+// confirms the older calls work for your account.
 //
 // Settings (Vercel environment variables):
-//   DERIV_ADMIN_TOKEN   required. A Deriv API token with the Admin scope. Never shown to anyone, never logged.
+//   DERIV_AUTO_CREATE   set to 1 to switch this on. Anything else = off, and the pool is used.
+//   DERIV_ADMIN_TOKEN   required when on. A Deriv API token with the Admin scope. Never shown to anyone, never logged.
 //   DERIV_REDIRECT_URI  required for free sites: the login return address of your main site (copy the Authorisation URL of your existing app).
 //   DERIV_REDIRECT_PATH optional, default "/": path appended to a custom domain, e.g. "/callback".
 //   DERIV_APP_SCOPES    optional, default "read,trade,trading_information".
@@ -33,6 +36,8 @@ function settings() {
 }
 
 const isConfigured = () => !!settings().token;
+// On only when you ask for it (DERIV_AUTO_CREATE=1) AND a token exists.
+const isEnabled = () => isConfigured() && env('DERIV_AUTO_CREATE') === '1';
 
 // What is missing, in words the admin panel can show.
 function missingSettings() {
@@ -157,4 +162,4 @@ async function checkConnection() {
     return { ok: scopes.includes('admin'), scopes, loginid: a.loginid || '' };
 }
 
-module.exports = { DerivError, isConfigured, missingSettings, settings, appName, redirectFor, registerApp, updateApp, checkConnection, setTransport, defaultTransport };
+module.exports = { DerivError, isConfigured, isEnabled, missingSettings, settings, appName, redirectFor, registerApp, updateApp, checkConnection, setTransport, defaultTransport };

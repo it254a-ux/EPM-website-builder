@@ -1,7 +1,7 @@
-// Gives a site its Deriv App ID, and keeps the app's markup/redirect in step with the site.
-//   1. Preferred: create a fresh app for the site through Deriv's API (app_source = 'api').
-//   2. Fallback:  the next unused app of the same markup from the pre-made pool.
-//   3. Otherwise: the site waits as "awaiting App ID" and the admin can retry.
+// Gives a site its Deriv App ID.
+//   1. Normal:   the next unused app of the same markup from the pre-made pool (apps you make in the Deriv dashboard).
+//   2. Optional: only when DERIV_AUTO_CREATE=1, first try to create the app through Deriv's older API (app_source = 'api').
+//   3. Otherwise: the site waits as "awaiting App ID" until you add apps; the admin can retry.
 const { logEvent } = require('./events');
 const { tryAssign } = require('./app-pool');
 const deriv = require('./deriv-apps');
@@ -19,7 +19,7 @@ async function provisionApp(sql, siteId) {
     if (site.app_id) return { app_id: site.app_id, source: site.app_source || 'existing' };
 
     let error = '';
-    if (deriv.isConfigured()) {
+    if (deriv.isEnabled()) {
         // Claim the site first so two requests at the same moment cannot create two apps (a claim older than 2 minutes counts as abandoned).
         const claim = await sql`
             UPDATE sites SET app_source = 'creating', updated_at = now()
@@ -44,7 +44,7 @@ async function provisionApp(sql, siteId) {
         await sql`UPDATE sites SET app_source = NULL WHERE id = ${siteId} AND app_source = 'creating'`;
         await logEvent(sql, siteId, 'app_create_failed', { reason: error });
     } else {
-        error = 'Automatic app creation is off (DERIV_ADMIN_TOKEN is not set).';
+        error = `No unused app with ${Number(site.markup_percent)}% markup. Add some under App IDs.`;
     }
 
     const pooled = await tryAssign(sql, siteId, Number(site.markup_percent));

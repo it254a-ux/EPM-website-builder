@@ -60,24 +60,38 @@ Before production, implement and test:
 Any figures in the UI are illustrative and are not a promise of Deriv's
 terms, earnings, or payout timing.
 
-## Deriv apps for each site (automatic)
+## Deriv apps for each site (App ID pool)
 
-When an operator creates a site, the backend registers a Deriv app for it through
-Deriv's API (`api/_lib/deriv-apps.js`) with that site's markup and redirect, and
-stores the App ID on the site. Markup changes are pushed to the same app. If Deriv
-is unreachable the site falls back to the pre-made App ID pool, and otherwise
-waits as "awaiting App ID" until an admin clicks **Create on Deriv**.
+Every site gets its own Deriv app, so Deriv's markup report stays per site. Deriv's
+current API (api.derivws.com) has no documented way to create or change apps, so
+apps are made by hand in the Deriv dashboard and handed out automatically:
 
-Set these in Vercel (Settings, Environment Variables), then redeploy:
+1. In the Deriv dashboard, make several apps for each markup group you offer
+   (1, 1.5, 2, 2.5 and 3 percent). Use your main site's Authorisation URL as the
+   redirect URL.
+2. In the admin panel, open **App IDs**, pick the group, paste the App IDs and
+   click Add to pool.
+3. When an operator creates a site, it takes the next free app with exactly its
+   markup (`api/_lib/app-pool.js`, one SQL statement, so two sites never share an
+   app). That markup is then fixed by the app, so the operator cannot change it
+   afterwards.
+4. If a group is empty the site waits as "awaiting App ID" and gets one as soon as
+   you add apps. The admin panel shows an **Add Deriv apps** warning when a group
+   is empty with sites waiting, or down to two free apps.
 
-| Variable | Needed | What it is |
-| --- | --- | --- |
-| `DERIV_ADMIN_TOKEN` | yes | A Deriv API token with the **Admin** scope. Keep it secret. |
-| `DERIV_REDIRECT_URI` | yes | The login return address of your main site (free sites share it). |
-| `DERIV_REDIRECT_PATH` | no | Path added to a custom domain, default `/`. |
-| `DERIV_APP_SCOPES` | no | Default `read,trade,trading_information`. |
-| `DERIV_WS_URL` / `DERIV_WS_APP_ID` | no | Override the Deriv socket address / the id used to open it. |
+Run `api/_lib/schema.sql` once in Neon (it is safe to run again) after each update.
 
-The admin panel has a **Deriv connection** card with a Test connection button.
-Run `api/_lib/schema.sql` once in Neon (it is safe to run again) before deploying:
-it adds `sites.app_source`.
+### Optional: automatic app creation (off by default)
+
+`api/_lib/deriv-apps.js` can register and update apps through Deriv's older
+WebSocket API. Deriv's current docs do not describe this, so it is untested
+against a live account and stays off unless you set `DERIV_AUTO_CREATE=1`.
+
+| Variable | What it is |
+| --- | --- |
+| `DERIV_AUTO_CREATE` | `1` switches it on. Anything else leaves it off. |
+| `DERIV_ADMIN_TOKEN` | A Deriv API token with the Admin scope. Keep it secret. |
+| `DERIV_REDIRECT_URI` | The login return address of your main site. |
+| `DERIV_REDIRECT_PATH` | Path added to a custom domain, default `/`. |
+| `DERIV_APP_SCOPES` | Default `read,trade,trading_information`. |
+| `DERIV_WS_URL` / `DERIV_WS_APP_ID` | Override the socket address / the id used to open it. |

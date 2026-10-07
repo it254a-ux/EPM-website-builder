@@ -40,13 +40,39 @@
             el('span', { class: 'muted', text: sites.length + ' sites · ' + owners.length + ' accounts' }),
             el('button', { text: 'Sign out', onclick: function () { api('/api/auth?action=logout', 'POST').then(login); } })]));
 
+        // ----- App ID stock (computed first so the warning sits on top) -----
+        var LOW_STOCK = 2; // a tier with this many free apps or fewer is "running low"
+        var waitingBy = {};
+        sites.forEach(function (s) { if (!s.app_id) waitingBy[Number(s.markup_percent)] = (waitingBy[Number(s.markup_percent)] || 0) + 1; });
+        var tierMap = {};
+        (pool.tiers || []).forEach(function (t) { tierMap[Number(t.markup_percent)] = t; });
+        [1, 1.5, 2, 2.5, 3].forEach(function (m) { if (!tierMap[m]) tierMap[m] = { markup_percent: m, free: 0, used: 0 }; });
+        Object.keys(waitingBy).forEach(function (m) { if (!tierMap[Number(m)]) tierMap[Number(m)] = { markup_percent: Number(m), free: 0, used: 0 }; });
+        function tierState(m) {
+            var t = tierMap[m], w = waitingBy[m] || 0;
+            if (w > 0 && t.free < w) return 'short';                       // sites are waiting and there are not enough free apps
+            if ((t.used > 0 || w > 0) && t.free <= LOW_STOCK) return 'low'; // in use, and nearly out
+            return 'ok';
+        }
+        var tierKeys = Object.keys(tierMap).map(Number).sort(function (a, b) { return a - b; });
+        var shortTiers = tierKeys.filter(function (m) { return tierState(m) === 'short'; });
+        var lowTiers = tierKeys.filter(function (m) { return tierState(m) === 'low'; });
+        if (shortTiers.length || lowTiers.length) {
+            var lines = [];
+            shortTiers.forEach(function (m) { var need = (waitingBy[m] || 0) - tierMap[m].free; lines.push(m.toFixed(2) + '% markup: ' + (waitingBy[m] || 0) + ' site(s) waiting, add at least ' + need + ' more app(s).'); });
+            lowTiers.forEach(function (m) { lines.push(m.toFixed(2) + '% markup: only ' + tierMap[m].free + ' free app(s) left. Add more soon.'); });
+            app.appendChild(el('div', { class: 'card', style: 'border-color:#c0392b' }, [el('h2', { text: 'Add Deriv apps' }),
+                el('p', { class: 'muted', text: 'New sites take the next free app for their markup. Make more in the Deriv dashboard, then paste their App IDs under "App IDs" below.' })]
+                .concat(lines.map(function (t) { return el('p', { class: 'err', text: t }); }))));
+        }
+
         var siteRows = sites.map(function (s) {
             var btns = el('div', { class: 'row' });
             if (s.status !== 'active') btns.appendChild(el('button', { text: 'Approve', onclick: function () { act({ action: 'set_status', site_id: s.id, status: 'active' }); } }));
             if (s.status !== 'suspended') btns.appendChild(el('button', { text: 'Suspend', onclick: function () { act({ action: 'set_status', site_id: s.id, status: 'suspended' }); } }));
             if (s.custom_domain_requested) btns.appendChild(el('button', { text: 'Approve ' + s.custom_domain_requested, onclick: function () {
                 if (confirm('Add ' + s.custom_domain_requested + ' to Vercel first' + (s.app_source === 'api' ? ' (its Deriv app is updated automatically)' : s.app_id ? ' and to the redirect list of its Deriv app (' + s.app_id + ')' : '') + '. Switch the site now?')) act({ action: 'approve_custom', site_id: s.id }); } }));
-            if (!s.app_id) btns.appendChild(el('button', { text: 'Create on Deriv', onclick: function () { act({ action: 'create_app', site_id: s.id }); } }));
+            if (!s.app_id && dv.enabled) btns.appendChild(el('button', { text: 'Create on Deriv', onclick: function () { act({ action: 'create_app', site_id: s.id }); } }));
             if (!s.app_id) btns.appendChild(el('button', { text: 'Take from pool', onclick: function () { act({ action: 'assign_from_pool', site_id: s.id }); } }));
             btns.appendChild(el('button', { text: s.app_id ? 'Change App ID' : 'Assign App ID', onclick: function () {
                 var v = prompt('Deriv App ID for ' + s.name + ' (create the app in Deriv first, with ' + s.markup_percent + '% markup). Leave blank to clear.', s.app_id || '');
@@ -63,28 +89,21 @@
         });
         // ----- Deriv connection -----
         var dvMsg = el('div', { class: 'muted' });
-        var dvText = dv.configured
-            ? 'Automatic app creation is ON. Each new site gets its own Deriv app with its markup, and markup changes reach Deriv by themselves.' + (dv.missing && dv.missing.length ? ' Still missing: ' + dv.missing.join(', ') + '.' : '')
-            : 'Automatic app creation is OFF. Add ' + ((dv.missing && dv.missing.length) ? dv.missing.join(' and ') : 'DERIV_ADMIN_TOKEN') + ' in Vercel (Settings, Environment Variables) and redeploy. Until then new sites use the App ID pool below.';
+        var dvText = 'Experimental automatic app creation is ON. New sites try to get an app through Deriv\u2019s older API first and fall back to the App IDs below.' + (dv.missing && dv.missing.length ? ' Still missing: ' + dv.missing.join(', ') + '.' : '');
         var testBtn = el('button', { text: 'Test connection', onclick: function () {
             dvMsg.textContent = 'Checking...'; testBtn.disabled = true;
             api('/api/admin', 'POST', { action: 'deriv_test' }).then(function (r) {
                 testBtn.disabled = false;
                 dvMsg.textContent = r.error ? r.error : 'Connected to Deriv with the Admin scope' + (r.loginid ? ' (account ' + r.loginid + ')' : '') + (r.missing && r.missing.length ? '. Still missing: ' + r.missing.join(', ') + '.' : '. Ready.'); }); } });
-        app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Deriv connection' }), el('p', { class: 'muted', text: dvText }), el('div', { class: 'row' }, [testBtn, dvMsg])]));
+        if (dv.enabled) app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Deriv connection' }), el('p', { class: 'muted', text: dvText }), el('div', { class: 'row' }, [testBtn, dvMsg])]));
 
         app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Sites' }), table(['Name', 'Domain', 'Plan', 'Status', 'You keep', 'Markup', 'App ID', 'Owner', 'Actions'], siteRows)]));
 
-        // ----- App ID pool -----
-        var waitingBy = {};
-        sites.forEach(function (s) { if (!s.app_id) waitingBy[Number(s.markup_percent)] = (waitingBy[Number(s.markup_percent)] || 0) + 1; });
-        var tierMap = {};
-        (pool.tiers || []).forEach(function (t) { tierMap[Number(t.markup_percent)] = t; });
-        [1, 1.5, 2, 2.5, 3].forEach(function (m) { if (!tierMap[m]) tierMap[m] = { markup_percent: m, free: 0, used: 0 }; });
-        Object.keys(waitingBy).forEach(function (m) { if (!tierMap[Number(m)]) tierMap[Number(m)] = { markup_percent: Number(m), free: 0, used: 0 }; });
-        var tierRows = Object.keys(tierMap).map(Number).sort(function (a, b) { return a - b; }).map(function (m) {
-            var t = tierMap[m], w = waitingBy[m] || 0;
-            return [m.toFixed(2) + '%', String(t.free), String(t.used), w ? el('span', { class: 'pill', text: w + ' waiting' }) : '0'];
+        // ----- App IDs (the pool) -----
+        var tierRows = tierKeys.map(function (m) {
+            var t = tierMap[m], w = waitingBy[m] || 0, st = tierState(m);
+            return [m.toFixed(2) + '%', String(t.free), String(t.used), w ? el('span', { class: 'pill', text: w + ' waiting' }) : '0',
+                st === 'short' ? el('span', { class: 'pill', text: 'Add apps now' }) : st === 'low' ? el('span', { class: 'pill', text: 'Running low' }) : 'OK'];
         });
         var tierSel = el('select', {}, [1, 1.5, 2, 2.5, 3].map(function (m) { return el('option', { value: String(m), text: m.toFixed(2) + '% markup' }); }));
         var idsBox = el('textarea', { rows: '4', placeholder: 'Paste the App IDs of apps you made in Deriv with this markup. One per line, or separated by commas.' });
@@ -95,9 +114,9 @@
                 addBtn.disabled = false;
                 if (r.error) { poolMsg.textContent = r.error; return; }
                 alert('Added ' + r.added + (r.skipped ? ', skipped ' + r.skipped + ' (already known)' : '') + (r.assigned ? '. ' + r.assigned + ' waiting site(s) got an App ID.' : '.')); load(); }); } });
-        app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'App ID pool (backup)' }),
-            el('p', { class: 'muted', text: 'Used only when automatic creation is off or Deriv is unavailable. Create apps in Deriv by hand (one per future site, each with its markup and your main-domain redirect URL), then paste their IDs here. New sites take the next unused app with their exact markup, one site per app. Sites wait as "awaiting App ID" when a tier runs out.' }),
-            table(['Markup', 'Free', 'Used', 'Sites waiting'], tierRows),
+        app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'App IDs' }),
+            el('p', { class: 'muted', text: 'Deriv apps are made in the Deriv dashboard, so make them ahead of time: one app per future site, with the markup of its group and your main site\u2019s redirect URL. Paste the App IDs here. When a site is created it automatically takes the next free app with exactly its markup, one site per app. If a group runs out, the site waits as "awaiting App ID" and gets one the moment you add apps.' }),
+            table(['Markup', 'Free', 'Used', 'Sites waiting', 'Status'], tierRows),
             el('div', { style: 'height:10px' }), tierSel, el('div', { style: 'height:8px' }), idsBox, el('div', { class: 'row', style: 'margin-top:8px' }, [addBtn, poolMsg])]));
 
         var ownerRows = owners.map(function (o) {
@@ -116,7 +135,7 @@
             if (r[0].__status === 401) return login();
             if (r[0].__status === 403) { clear(); app.appendChild(el('p', { class: 'err', text: 'This account is not an admin.' })); return; }
             if (r[0].__status === 404) { clear(); app.appendChild(el('p', { class: 'err', text: 'Admin is not available on this domain.' })); return; }
-            render(r[0].sites || [], r[1].owners || [], r[2] && !r[2].error ? r[2] : { tiers: [], apps: [] }, r[3] && !r[3].error ? r[3] : { configured: false, missing: ['DERIV_ADMIN_TOKEN'] });
+            render(r[0].sites || [], r[1].owners || [], r[2] && !r[2].error ? r[2] : { tiers: [], apps: [] }, r[3] && !r[3].error ? r[3] : { enabled: false, configured: false, missing: [] });
         });
     }
     load();

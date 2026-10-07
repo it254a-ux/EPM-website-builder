@@ -61,10 +61,11 @@ test.beforeEach(async () => {
     await freshDb();
     process.env.PLATFORM_HOSTS = HOST; process.env.PLATFORM_ROOT_DOMAIN = 'free.test';
     process.env.DERIV_ADMIN_TOKEN = TOKEN;
+    process.env.DERIV_AUTO_CREATE = '1';
     process.env.DERIV_REDIRECT_URI = 'https://main.test/callback';
     delete process.env.DERIV_REDIRECT_PATH;
 });
-test.afterEach(() => { deriv.setTransport(null); delete process.env.DERIV_ADMIN_TOKEN; delete process.env.DERIV_REDIRECT_URI; delete process.env.DERIV_WS_URL; });
+test.afterEach(() => { deriv.setTransport(null); delete process.env.DERIV_ADMIN_TOKEN; delete process.env.DERIV_AUTO_CREATE; delete process.env.DERIV_REDIRECT_URI; delete process.env.DERIV_WS_URL; });
 
 test('a new site gets its own Deriv app, with its markup and the main-domain redirect', async () => {
     const calls = fakeDeriv();
@@ -157,6 +158,52 @@ test('without a token nothing calls Deriv and the pool works exactly as before',
     assert.deepEqual(status.body.missing, ['DERIV_ADMIN_TOKEN']);
 });
 
+test('with a token but the switch off (the default), Deriv is never called and the pool is used', async () => {
+    delete process.env.DERIV_AUTO_CREATE;
+    const calls = fakeDeriv();
+    const adm = await login('admin', 'admin@example.com');
+    await call(admin, { method: 'POST', cookie: adm.cookie, body: { action: 'pool_add', markup_percent: '3', app_ids: 'POOLAPP3A, POOLAPP3B' } });
+    const a = await login('operator', 'a@example.com');
+    const b = await login('operator', 'b@example.com');
+    const c = await login('operator', 'c@example.com');
+    const ra = await call(mySite, { method: 'POST', cookie: a.cookie, body: { name: 'Alpha', subdomain: 'alpha', markup_percent: '3' } });
+    const rb = await call(mySite, { method: 'POST', cookie: b.cookie, body: { name: 'Beta', subdomain: 'beta', markup_percent: '3' } });
+    const rc = await call(mySite, { method: 'POST', cookie: c.cookie, body: { name: 'Gamma', subdomain: 'gamma', markup_percent: '3' } });
+    assert.deepEqual([ra.body.site.app_id, rb.body.site.app_id], ['POOLAPP3A', 'POOLAPP3B'], 'each site gets its own app, oldest first');
+    assert.equal(rc.body.site.app_status, 'awaiting', 'the third site waits: the 3% group is empty');
+    assert.equal(calls.length, 0);
+    const status = await call(admin, { cookie: adm.cookie, query: { resource: 'deriv' } });
+    assert.equal(status.body.enabled, false);
+    assert.equal(status.body.configured, true);
+    // stocking the group serves the waiting site straight away
+    const add = await call(admin, { method: 'POST', cookie: adm.cookie, body: { action: 'pool_add', markup_percent: '3', app_ids: 'POOLAPP3C' } });
+    assert.equal(add.body.assigned, 1);
+    assert.equal((await call(mySite, { cookie: c.cookie })).body.site.app_id, 'POOLAPP3C');
+});
+
+test('an admin retry on an empty group says which group needs apps', async () => {
+    delete process.env.DERIV_AUTO_CREATE;
+    const op = await login('operator', 'op@example.com');
+    const adm = await login('admin', 'admin@example.com');
+    await call(mySite, { method: 'POST', cookie: op.cookie, body: { name: 'Julias', subdomain: 'julias', markup_percent: '2' } });
+    const siteId = (await sql`SELECT id FROM sites`)[0].id;
+    const r = await call(admin, { method: 'POST', cookie: adm.cookie, body: { action: 'create_app', site_id: siteId } });
+    assert.equal(r.status, 409);
+    assert.match(r.body.error, /No unused app with 2% markup/);
+});
+
+test('a site that was given a pooled app has its markup locked, as before', async () => {
+    delete process.env.DERIV_AUTO_CREATE;
+    const adm = await login('admin', 'admin@example.com');
+    await call(admin, { method: 'POST', cookie: adm.cookie, body: { action: 'pool_add', markup_percent: '2', app_ids: 'POOLAPP2A' } });
+    const op = await login('operator', 'op@example.com');
+    const r = await call(mySite, { method: 'POST', cookie: op.cookie, body: { name: 'Julias', subdomain: 'julias', markup_percent: '2' } });
+    assert.equal(r.body.site.markup_locked, true);
+    const e = await call(mySite, { method: 'PUT', cookie: op.cookie, body: { markup_percent: '3' } });
+    assert.equal(e.status, 400);
+    assert.ok(e.body.fields.markup_percent);
+});
+
 test('two requests at the same moment create only one Deriv app', async () => {
     const calls = fakeDeriv();
     const op = await login('operator', 'op@example.com');
@@ -210,13 +257,13 @@ test('edits that do not touch the markup never call Deriv', async () => {
 
 test('a hand-assigned or pooled App ID is never changed through the API', async () => {
     const calls = fakeDeriv();
-    delete process.env.DERIV_ADMIN_TOKEN;
+    delete process.env.DERIV_AUTO_CREATE;
     const op = await login('operator', 'op@example.com');
     const adm = await login('admin', 'admin@example.com');
     await call(mySite, { method: 'POST', cookie: op.cookie, body: { name: 'Julias', subdomain: 'julias', markup_percent: '1' } });
     const siteId = (await sql`SELECT id FROM sites`)[0].id;
     await call(admin, { method: 'POST', cookie: adm.cookie, body: { action: 'set_app_id', site_id: siteId, app_id: '33C8pzDfszs5p4KQabqit' } });
-    process.env.DERIV_ADMIN_TOKEN = TOKEN;
+    process.env.DERIV_AUTO_CREATE = '1';
     const r = await call(mySite, { method: 'PUT', cookie: op.cookie, body: { markup_percent: '2' } });
     assert.equal(r.status, 200);
     assert.equal(calls.length, 0);

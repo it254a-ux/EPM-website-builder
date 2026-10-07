@@ -60,8 +60,8 @@ module.exports = async function handler(req, res) {
                 return send(res, 200, { tiers: tiers.map(t => ({ ...t, markup_percent: Number(t.markup_percent) })), apps });
             }
             if (resource === 'deriv') {
-                // Is automatic app creation switched on? Names only what is missing, never the token itself.
-                return send(res, 200, { configured: deriv.isConfigured(), missing: deriv.missingSettings() });
+                // Is the optional automatic app creation on? Names only what is missing, never the token itself.
+                return send(res, 200, { enabled: deriv.isEnabled(), configured: deriv.isConfigured(), missing: deriv.missingSettings() });
             }
             if (resource === 'owners') {
                 const rows = await sql`SELECT id, email, name, role, disabled, created_at FROM owners ORDER BY created_at DESC LIMIT 500`;
