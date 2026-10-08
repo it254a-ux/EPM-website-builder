@@ -122,7 +122,7 @@ Operators see their earnings per day and per month, and can request a withdrawal
 Your own central bot library stays in the trading site (`free_bots`). This step adds what an operator puts on **their own site**.
 
 **Setup**
-1. Run `api/_lib/schema.sql` in Neon (adds `site_bots`, `site_strategies`, `bot_requests`). Safe to run again.
+1. Run `api/_lib/schema.sql` in Neon (adds `site_bots`, `site_strategies`, `site_bot_requests`). Safe to run again.
 2. For document uploads: in Vercel, open the project, go to **Storage**, create a **Blob** store and connect it to `appbuilder`. Vercel adds `BLOB_READ_WRITE_TOKEN` by itself. Redeploy. Without it the Strategies page says uploads are off; bots and requests still work.
 
 **Rules**

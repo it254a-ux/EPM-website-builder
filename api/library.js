@@ -107,9 +107,9 @@ module.exports = async function handler(req, res) {
                 if (!title) return fail(res, { field: 'title', error: 'Give the bot idea a short title.' });
                 if (details.length < 10) return fail(res, { field: 'details', error: 'Describe what the bot should do (at least a sentence).' });
                 const r = await sql`
-                    INSERT INTO bot_requests (owner_id, site_id, title, details)
+                    INSERT INTO site_bot_requests (owner_id, site_id, title, details)
                     SELECT ${me.id}, ${site ? site.id : null}, ${title}, ${details}
-                    WHERE (SELECT count(*) FROM bot_requests WHERE owner_id = ${me.id} AND status = 'open') < ${L.LIMITS.openRequests}
+                    WHERE (SELECT count(*) FROM site_bot_requests WHERE owner_id = ${me.id} AND status = 'open') < ${L.LIMITS.openRequests}
                     RETURNING id`;
                 if (!r.length) return send(res, 400, { error: `You already have ${L.LIMITS.openRequests} requests waiting. Please wait for answers first.` });
                 await audit(sql, me.id, 'bot_requested', r[0].id, { title });
@@ -117,7 +117,7 @@ module.exports = async function handler(req, res) {
             }
 
             case 'cancel_request': {
-                const r = await sql`UPDATE bot_requests SET status = 'cancelled', decided_at = now() WHERE id = ${Number(body.id) || 0} AND owner_id = ${me.id} AND status = 'open' RETURNING id`;
+                const r = await sql`UPDATE site_bot_requests SET status = 'cancelled', decided_at = now() WHERE id = ${Number(body.id) || 0} AND owner_id = ${me.id} AND status = 'open' RETURNING id`;
                 if (!r.length) return send(res, 404, { error: 'That request is not waiting any more.' });
                 return send(res, 200, await L.operatorView(sql, me.id));
             }

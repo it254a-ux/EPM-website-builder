@@ -190,7 +190,7 @@ CREATE TABLE IF NOT EXISTS site_strategies (
 CREATE INDEX IF NOT EXISTS site_strategies_site_idx ON site_strategies (site_id, status);
 
 -- "Request a bot": an operator asks you to build one.
-CREATE TABLE IF NOT EXISTS bot_requests (
+CREATE TABLE IF NOT EXISTS site_bot_requests (
     id         SERIAL PRIMARY KEY,
     owner_id   INTEGER NOT NULL REFERENCES owners(id) ON DELETE CASCADE,
     site_id    INTEGER REFERENCES sites(id) ON DELETE SET NULL,
@@ -201,4 +201,4 @@ CREATE TABLE IF NOT EXISTS bot_requests (
     created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
     decided_at TIMESTAMPTZ
 );
-CREATE INDEX IF NOT EXISTS bot_requests_owner_idx ON bot_requests (owner_id, id DESC);
+CREATE INDEX IF NOT EXISTS site_bot_requests_owner_idx ON site_bot_requests (owner_id, id DESC);

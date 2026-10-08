@@ -376,7 +376,7 @@ module.exports = async function handler(req, res) {
                 if (!['done', 'declined'].includes(body.status)) return send(res, 400, { error: 'Choose done or declined.' });
                 const note = L.clean(body.note, L.LIMITS.note);
                 if (body.status === 'declined' && !note) return send(res, 400, { error: 'Write a short reason. The operator will see it.' });
-                const r = await sql`UPDATE bot_requests SET status = ${body.status}, admin_note = ${note || null}, decided_at = now() WHERE id = ${Number(body.id) || 0} AND status = 'open' RETURNING id`;
+                const r = await sql`UPDATE site_bot_requests SET status = ${body.status}, admin_note = ${note || null}, decided_at = now() WHERE id = ${Number(body.id) || 0} AND status = 'open' RETURNING id`;
                 if (!r.length) return send(res, 404, { error: 'That request is not open.' });
                 await audit(sql, me.id, 'request_answer', r[0].id, { status: body.status });
                 return send(res, 200, await L.adminView(sql));
