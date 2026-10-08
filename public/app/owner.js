@@ -404,8 +404,31 @@
                 clear(out);
                 if (!label) { out.textContent = 'Type a name to search.'; return; }
                 if (!/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/.test(label)) { out.textContent = 'Use only letters, numbers and hyphens, with no spaces, and do not start or end with a hyphen.'; return; }
-                out.appendChild(el('p', {}, ['Searching for ', el('strong', { text: label }), ' is not switched on yet.']));
-                out.appendChild(el('p', { text: 'Availability and prices in KES will appear here once a domain registrar and M-Pesa payments are connected. Nothing is charged today.' }));
+                out.appendChild(el('p', { text: 'Searching\u2026' }));
+                api('/api/domains?name=' + encodeURIComponent(label)).then(function (r) {
+                    clear(out);
+                    if (!r || !r.results) { out.appendChild(el('div', { class: 'notice bad', text: (r && r.error) || 'Could not search. Please try again.' })); return; }
+                    var money = function (n) { return Number(n).toLocaleString('en-KE', { maximumFractionDigits: 0 }); };
+                    var usd = function (n) { return '$' + Number(n).toFixed(2); };
+                    r.results.forEach(function (d) {
+                        var right;
+                        if (!d.available) right = el('span', { class: 'muted small', text: 'Taken' });
+                        else if (!d.offered) right = el('span', { class: 'muted small', text: d.reason || 'Not available here' });
+                        else {
+                            var first = r.kes_available && d.price_kes ? 'KES ' + money(d.price_kes) : usd(d.price_usd);
+                            var renew = r.kes_available && d.renewal_kes ? 'KES ' + money(d.renewal_kes) : usd(d.renewal_usd);
+                            var jump = d.renewal_usd > d.price_usd * 1.5;
+                            right = el('div', {}, [
+                                el('div', {}, [el('strong', { text: first }), el('span', { class: 'muted small', text: ' for the first year' + (r.kes_available ? ' (' + usd(d.price_usd) + ')' : '') })]),
+                                el('div', { class: jump ? 'err small' : 'muted small', text: 'Renews at ' + renew + ' a year after that.' }),
+                                el('button', { class: 'btn', type: 'button', disabled: 'disabled', title: 'M-Pesa payment is being connected', text: 'Buying opens soon' })]);
+                        }
+                        out.appendChild(el('div', { class: 'card', style: 'margin-top:8px' }, [el('div', { class: 'row', style: 'justify-content:space-between;align-items:center' }, [el('strong', { text: d.domain }), right])]));
+                    });
+                    if (!r.kes_available) out.appendChild(el('p', { class: 'muted small', text: 'Prices are shown in US dollars for now. Payment is by M-Pesa in shillings.' }));
+                    if (r.rate_credit) out.appendChild(el('p', { class: 'muted small' }, ['Rates By ', el('a', { href: 'https://www.exchangerate-api.com', target: '_blank', rel: 'noopener noreferrer', text: 'Exchange Rate API' }), '.']));
+                    out.appendChild(el('p', { class: 'muted small', text: 'Nothing is charged by searching. Buying is not open yet.' }));
+                });
             }
             q.addEventListener('keydown', function (e) { if (e.key === 'Enter') search(); });
             body.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Find a domain' }),
