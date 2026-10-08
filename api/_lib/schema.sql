@@ -202,3 +202,13 @@ CREATE TABLE IF NOT EXISTS site_bot_requests (
     decided_at TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS site_bot_requests_owner_idx ON site_bot_requests (owner_id, id DESC);
+
+-- Daily USD to KES exchange rate, so domain prices in shillings follow the market. One row per refresh.
+CREATE TABLE IF NOT EXISTS fx_rates (
+    id         SERIAL PRIMARY KEY,
+    pair       TEXT NOT NULL,                        -- 'USD_KES'
+    rate       NUMERIC(12,4) NOT NULL,               -- shillings for one dollar
+    source     TEXT NOT NULL,
+    fetched_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS fx_rates_pair_idx ON fx_rates (pair, id DESC);
