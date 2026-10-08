@@ -130,3 +130,16 @@ Your own central bot library stays in the trading site (`free_bots`). This step 
 - Removing or deleting a document deletes the stored file, so its old link stops working. Deleting a site or account deletes its files too.
 - Bot files must be Deriv Bot `.xml` (no DOCTYPE/ENTITY/script). Documents: PDF, DOCX, XLSX, PPTX, PNG, JPG, TXT, up to 3 MB, and the file contents must match the type. Up to 50 bots and 50 documents per site; 5 open bot requests per operator.
 - Visitors read a site's items from `GET /api/site-library?host=<site domain>` (list) and `...&id=<bot id>` (one bot with its file). Only live items of active sites are returned, with no owner details. **The trading site still has to call this** (or read the same tables) to show them next to the central library; that change is in the `epm-botbuilder` repo and is not part of this step.
+
+## Adding approved domains to Vercel automatically (optional)
+
+When you approve an operator's own domain, the platform can add it to the Vercel project that serves the operator sites. Without this, add each domain by hand in Vercel as before.
+
+1. In Vercel, click your profile picture, then **Account Settings**, then **Tokens**. Create a token (name it `epm-domains`, scope it to your team, short expiry is safer). Copy it once.
+2. In Vercel, open the project **appbuilder**, then **Settings**, then **Environment Variables**. Add:
+   - `DOMAINS_VERCEL_TOKEN`: the token. Paste it here only, never in chat.
+   - `DOMAINS_VERCEL_PROJECT`: the name of the Vercel project that serves the operator sites (the one your DNS records point at).
+   - `DOMAINS_VERCEL_TEAM`: only if that project is inside a team. The team ID starts with `team_`.
+3. Redeploy. In the admin panel, **Approve** now adds the domain to Vercel. Each own-domain site also has a **Connect to Vercel** button to retry.
+
+Untested against live Vercel until the first real approval.

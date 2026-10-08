@@ -7,6 +7,7 @@ const deriv = require('./_lib/deriv-apps');
 const { provisionApp, syncAppToDeriv, reasonOf } = require('./_lib/site-app');
 const C = require('./_lib/commissions');
 const L = require('./_lib/library');
+const VD = require('./_lib/vercel-domains');
 
 const send = (res, code, body) => res.status(code).json(body);
 const n = v => (v === undefined ? null : v);
@@ -26,7 +27,7 @@ const audit = (sql, adminId, action, target, detail) =>
 //   3. state-changing calls must come from the same site (no cross-site posts)
 //
 //   GET  /api/admin?resource=sites | owners | audit | pool | deriv | commissions | library
-//   POST /api/admin  { action: set_status | update_site | approve_custom | create_app | deriv_test | commission_sync | confirm_month | payout_paid | payout_reject | library_remove | library_restore | request_answer | set_app_id | set_markup | pool_add | pool_remove | assign_from_pool | set_rate | disable_owner | delete_site | delete_owner, ... }
+//   POST /api/admin  { action: set_status | update_site | approve_custom | connect_domain | create_app | deriv_test | commission_sync | confirm_month | payout_paid | payout_reject | library_remove | library_restore | request_answer | set_app_id | set_markup | pool_add | pool_remove | assign_from_pool | set_rate | disable_owner | delete_site | delete_owner, ... }
 module.exports = async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store');
     if (!A.onPlatformHost(req, 'strict')) return send(res, 404, { error: 'Not found' });
@@ -147,7 +148,28 @@ module.exports = async function handler(req, res) {
                     try { await syncAppToDeriv(sql, site, { plan: 'custom', domain: site.custom_domain_requested }); await logEvent(sql, siteId, 'app_redirect_updated', { domain: site.custom_domain_requested }); }
                     catch (err) { derivWarning = `The site is switched, but the Deriv app's redirect was not updated (${reasonOf(err)}). Update it in Deriv.`; }
                 }
-                return send(res, 200, derivWarning ? { ok: true, warning: derivWarning } : { ok: true });
+                // Add the domain to the Vercel project for you. Also not fatal: the admin can retry with "Connect to Vercel".
+                const vercel = await VD.addDomain(site.custom_domain_requested);
+                if (vercel.status !== 'off') await logEvent(sql, siteId, 'domain_vercel_' + vercel.status, { domain: site.custom_domain_requested });
+                const warnings = [derivWarning];
+                if (['needs_verification', 'conflict', 'failed'].includes(vercel.status)) warnings.push(`The site is switched, but ${vercel.message}`);
+                const warning = warnings.filter(Boolean).join(' ');
+                const out = { ok: true };
+                if (warning) out.warning = warning;
+                else if (vercel.status === 'added' || vercel.status === 'already_added') out.notice = vercel.message;
+                return send(res, 200, out);
+            }
+
+            // Retry (or do for the first time) adding a custom-domain site's address to the Vercel project.
+            case 'connect_domain': {
+                const site = await getSite();
+                if (!site) return send(res, 404, { error: 'Site not found.' });
+                if (site.plan !== 'custom') return send(res, 400, { error: 'Only sites on their own domain need this.' });
+                if (!VD.isConfigured()) return send(res, 409, { error: `Not set up yet. Add ${VD.missingSettings().join(' and ')} in Vercel.` });
+                const vercel = await VD.addDomain(site.domain);
+                await logEvent(sql, siteId, 'domain_vercel_' + vercel.status, { domain: site.domain });
+                await audit(sql, me.id, 'connect_domain', siteId, { domain: site.domain, result: vercel.status });
+                return send(res, 200, ['added', 'already_added'].includes(vercel.status) ? { ok: true, notice: vercel.message } : { ok: true, warning: vercel.message });
             }
 
             // Stock the pool: IDs of apps you made in Deriv, all with the same markup. Waiting sites get them straight away.

@@ -17,7 +17,7 @@
         return e;
     }
     function clear() { while (app.firstChild) app.removeChild(app.firstChild); }
-    function act(body) { return api('/api/admin', 'POST', body).then(function (r) { if (r.error) alert(r.error); else if (r.warning) alert(r.warning); load(); }); }
+    function act(body) { return api('/api/admin', 'POST', body).then(function (r) { if (r.error) alert(r.error); else if (r.warning) alert(r.warning); else if (r.notice) alert(r.notice); load(); }); }
 
     function login() {
         clear();
@@ -71,7 +71,8 @@
             if (s.status !== 'active') btns.appendChild(el('button', { text: 'Approve', onclick: function () { act({ action: 'set_status', site_id: s.id, status: 'active' }); } }));
             if (s.status !== 'suspended') btns.appendChild(el('button', { text: 'Suspend', onclick: function () { act({ action: 'set_status', site_id: s.id, status: 'suspended' }); } }));
             if (s.custom_domain_requested) btns.appendChild(el('button', { text: 'Approve ' + s.custom_domain_requested, onclick: function () {
-                if (confirm('Add ' + s.custom_domain_requested + ' to Vercel first' + (s.app_source === 'api' ? ' (its Deriv app is updated automatically)' : s.app_id ? ' and to the redirect list of its Deriv app (' + s.app_id + ')' : '') + '. Switch the site now?')) act({ action: 'approve_custom', site_id: s.id }); } }));
+                if (confirm('Approve ' + s.custom_domain_requested + '. If the Vercel connection is on, it is added to Vercel for you; if not, add it to the Vercel project yourself' + (s.app_source === 'api' ? ' (its Deriv app is updated automatically)' : s.app_id ? ' and to the redirect list of its Deriv app (' + s.app_id + ')' : '') + '. Switch the site now?')) act({ action: 'approve_custom', site_id: s.id }); } }));
+            if (s.plan === 'custom') btns.appendChild(el('button', { text: 'Connect to Vercel', onclick: function () { act({ action: 'connect_domain', site_id: s.id }); } }));
             if (!s.app_id && dv.enabled) btns.appendChild(el('button', { text: 'Create on Deriv', onclick: function () { act({ action: 'create_app', site_id: s.id }); } }));
             if (!s.app_id) btns.appendChild(el('button', { text: 'Take from pool', onclick: function () { act({ action: 'assign_from_pool', site_id: s.id }); } }));
             btns.appendChild(el('button', { text: s.app_id ? 'Change App ID' : 'Assign App ID', onclick: function () {
