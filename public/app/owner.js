@@ -171,7 +171,7 @@
     /* ---------- shell ---------- */
     var NAV = [
         ['sites', 'Sites', 'grid'], ['domains', 'Domains', 'globe'], ['deployments', 'Deployments', 'send'],
-        ['commissions', 'Commissions', 'cash'], ['bots', 'Trading bots', 'bot', true], ['strategies', 'Strategies', 'file', true],
+        ['commissions', 'Commissions', 'cash'], ['bots', 'Trading bots', 'bot'], ['strategies', 'Strategies', 'file'],
         ['support', 'Support', 'help'], ['settings', 'Settings', 'sliders'],
     ];
     function mountShell() {
@@ -202,8 +202,7 @@
             'sites': sitesView, 'sites/new': function () { return siteForm(true); }, 'sites/edit': function () { return siteForm(false); },
             'domains': domainsView, 'deployments': deploymentsView, 'support': supportView, 'settings': settingsView,
             'commissions': commissionsView,
-            'bots': function () { return soon('Algorithm marketplace', 'Trading bots', 'Browse the central bot library and upload your own bots for your site. Coming soon.'); },
-            'strategies': function () { return soon('Algorithm marketplace', 'Strategies', 'Upload strategy documents for your clients to download. Coming soon.'); },
+            'bots': botsView, 'strategies': strategiesView,
         };
         var render = views[path] || views[base] || sitesView;
         Array.prototype.forEach.call(sideEl.querySelectorAll('a'), function (a) { a.classList.toggle('on', a.getAttribute('data-route') === base); });
@@ -214,9 +213,6 @@
     function go(hash) { if (location.hash === hash) route(); else location.hash = hash; }
 
     /* ---------- pages ---------- */
-    function soon(kicker, title, text) {
-        return el('div', {}, [head(kicker, title), el('div', { class: 'card empty' }, [el('div', { class: 'bubble' }, [svg(ICON.menu)]), el('h2', { text: 'Coming soon' }), el('p', { text: text })])]);
-    }
     function supportBanner() {
         return el('div', { class: 'banner' }, [
             el('div', {}, [el('b', { text: 'Facing a challenge? Reach out to us' }), el('span', { text: 'We are here to help you get your site up and running.' })]),
@@ -557,6 +553,187 @@
         items.forEach(function (q) { faq.appendChild(el('details', {}, [el('summary', { text: q[0] }), el('p', { text: q[1] })])); });
         body.appendChild(faq);
         body.appendChild(supportBanner());
+    }
+
+    /* ---------- trading bots, strategies, bot requests ---------- */
+    var LIB_STATUS = { live: ['Live', 'active'], removed: ['Removed', 'suspended'] };
+    var REQ_STATUS = { open: ['Waiting', 'pending'], done: ['Done', 'active'], declined: ['Declined', 'suspended'], cancelled: ['Cancelled', ''] };
+    var CONTRACTS = ['Accumulators', 'Rise/Fall', 'Matches/Differs', 'Over/Under', 'Even/Odd', 'Multiplier', 'Other'];
+    function sizeText(n) { return n >= 1048576 ? (n / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(n / 1024)) + ' KB'; }
+    function readFile(file, asBase64) {
+        return new Promise(function (resolve, reject) {
+            var r = new FileReader();
+            r.onerror = function () { reject(new Error('read')); };
+            r.onload = function () { var v = String(r.result); resolve(asBase64 ? v.slice(v.indexOf(',') + 1) : v); };
+            if (asBase64) r.readAsDataURL(file); else r.readAsText(file);
+        });
+    }
+    // A labelled input with its own error line. Returns the wrapper and a setter for the message.
+    function box(label, input, hint) {
+        var err = el('div', { class: 'err' });
+        return { wrap: el('div', {}, [el('label', { text: label }), input, hint ? el('div', { class: 'muted small', text: hint }) : null, err]), input: input, setError: function (m) { err.textContent = m || ''; } };
+    }
+    function loadLibrary(v, body, render) {
+        api('/api/library').then(function (d) {
+            if (!viewEl || !viewEl.contains(v)) return; // you moved to another page meanwhile
+            clear(body);
+            if (d.error || !d.limits) { body.appendChild(el('div', { class: 'notice bad', text: d.error || 'Could not load this page.' })); return; }
+            if (!d.site) { body.appendChild(el('div', { class: 'card empty' }, [el('h2', { text: 'Create your site first' }), el('p', { text: 'Bots and documents belong to your site.' }),
+                el('button', { class: 'btn primary', text: 'Create new site', onclick: function () { go('#/sites/new'); } })])); return; }
+            render(d);
+        });
+    }
+    function tabBar(tabs, current, key) {
+        return el('div', { class: 'tabs', role: 'tablist' }, tabs.map(function (t) {
+            return el('button', { type: 'button', role: 'tab', class: 'tab' + (t[0] === current ? ' on' : ''), 'aria-selected': t[0] === current ? 'true' : 'false', text: t[1],
+                onclick: function () { S[key] = t[0]; route(); } });
+        }));
+    }
+
+    function botsView() {
+        var v = el('div'), tab = S.botTab || 'mine';
+        v.appendChild(head('Algorithm marketplace', 'Trading bots', 'Add your own bots to your site, or ask us to build one for you.'));
+        v.appendChild(tabBar([['mine', 'My bots'], ['request', 'Request a bot']], tab, 'botTab'));
+        var body = el('div', {}, [el('p', { class: 'muted', text: 'Loading…' })]);
+        v.appendChild(body);
+        loadLibrary(v, body, function (d) { (tab === 'request' ? botRequests : myBots)(body, d); });
+        return v;
+    }
+
+    function myBots(body, d) {
+        var editing = S.editBot ? d.bots.filter(function (b) { return b.id === S.editBot; })[0] : null;
+        if (S.editBot && !editing) S.editBot = null;
+        var f = {
+            name: box('Bot name', el('input', { type: 'text', name: 'name', maxlength: '120', autocomplete: 'off' })),
+            description: box('What does it do?', el('textarea', { name: 'description', maxlength: '2000' })),
+            market: box('Market', el('input', { type: 'text', name: 'market', maxlength: '80', autocomplete: 'off', placeholder: 'e.g. Volatility 100 (1s)' })),
+            risk_level: box('Risk level', el('select', { name: 'risk_level' }, ['Low', 'Medium', 'High'].map(function (r) { return el('option', { value: r, text: r }); }))),
+            contract_type: box('Contract type', el('select', { name: 'contract_type' }, CONTRACTS.map(function (c) { return el('option', { value: c, text: c }); }))),
+            xml_content: box(editing ? 'Replace the bot file (optional)' : 'Bot file', el('input', { type: 'file', name: 'file', accept: '.xml,text/xml,application/xml' }),
+                editing ? 'Leave this empty to keep the current file.' : 'Export your bot from Deriv Bot as an .xml file and choose it here.'),
+        };
+        if (editing) { f.name.input.value = editing.name; f.description.input.value = editing.description; f.market.input.value = editing.market; f.risk_level.input.value = editing.risk_level; f.contract_type.input.value = editing.contract_type; }
+        else { f.risk_level.input.value = 'Medium'; f.contract_type.input.value = 'Other'; }
+        var msg = el('div', { class: 'err' });
+        var save = el('button', { class: 'btn primary', text: editing ? 'Save changes' : 'Add bot' });
+        save.addEventListener('click', function () {
+            Object.keys(f).forEach(function (k) { f[k].setError(''); }); msg.textContent = '';
+            var file = f.xml_content.input.files && f.xml_content.input.files[0];
+            if (!file && !editing) { f.xml_content.setError('Choose the bot file (.xml).'); return; }
+            save.disabled = true;
+            (file ? readFile(file, false) : Promise.resolve(undefined)).then(function (xml) {
+                var payload = { action: editing ? 'update_bot' : 'add_bot', id: editing ? editing.id : undefined, name: f.name.input.value, description: f.description.input.value, market: f.market.input.value,
+                    risk_level: f.risk_level.input.value, contract_type: f.contract_type.input.value, xml_content: xml };
+                return api('/api/library', 'POST', payload);
+            }).then(function (r) {
+                save.disabled = false;
+                if (r.bots) { S.editBot = null; toast(editing ? 'Bot updated.' : 'Bot added. It is live on your site.'); route(); return; }
+                Object.keys(r.fields || {}).forEach(function (k) { if (f[k]) f[k].setError(r.fields[k]); });
+                msg.textContent = r.fields ? '' : (r.error || 'Could not save the bot.');
+            }).catch(function () { save.disabled = false; msg.textContent = 'Could not read that file.'; });
+        });
+        var actions = [save, msg];
+        if (editing) actions.splice(1, 0, el('button', { class: 'btn', text: 'Cancel', onclick: function () { S.editBot = null; route(); } }));
+        body.appendChild(el('div', { class: 'card' }, [el('h2', { text: editing ? 'Edit bot' : 'Add a bot' }),
+            el('p', { class: 'muted', text: 'A bot is live on your site as soon as you add it, next to the EPM library. You are responsible for the bots you add, because visitors run them on their own accounts. We can remove any bot at any time.' }),
+            f.name.wrap, f.description.wrap, f.market.wrap, f.risk_level.wrap, f.contract_type.wrap, f.xml_content.wrap,
+            el('div', { class: 'row', style: 'margin-top:12px' }, actions)]));
+
+        var list = el('div', { class: 'card' }, [el('h2', { text: 'Your bots' })]);
+        if (!d.bots.length) list.appendChild(el('p', { class: 'muted', text: 'You have not added any bots yet.' }));
+        else list.appendChild(simpleTable(['Bot', 'Market', 'Risk', 'Status', ''], d.bots.map(function (b) {
+            var st = LIB_STATUS[b.status] || [b.status, ''];
+            var acts = el('div', { class: 'row' }, [
+                b.status === 'live' ? el('button', { class: 'btn', text: 'Edit', onclick: function () { S.editBot = b.id; route(); } }) : null,
+                el('button', { class: 'btn', text: 'Delete', onclick: function () {
+                    if (!confirm('Delete "' + b.name + '"? It disappears from your site.')) return;
+                    api('/api/library', 'POST', { action: 'delete_bot', id: b.id }).then(function (x) { if (x.bots) { toast('Bot deleted.'); route(); } else toast(x.error || 'Could not delete.'); }); } })]);
+            return [el('div', {}, [el('b', { text: b.name }), el('div', { class: 'muted small', text: b.description })]), b.market, b.risk_level,
+                el('div', {}, [pill(st[0], st[1]), b.status === 'removed' && b.removed_note ? el('div', { class: 'muted small', text: 'Reason: ' + b.removed_note }) : null]), acts];
+        })));
+        body.appendChild(list);
+    }
+
+    function botRequests(body, d) {
+        var title = el('input', { type: 'text', name: 'title', maxlength: '120', autocomplete: 'off', placeholder: 'e.g. Even/Odd bot with a stop-loss' });
+        var details = el('textarea', { name: 'details', maxlength: '2000', placeholder: 'Which market, which contract type, how it should decide, and how risky you want it.' });
+        var ft = box('Short title', title), fd = box('What should the bot do?', details);
+        var msg = el('div', { class: 'err' });
+        var send = el('button', { class: 'btn primary', text: 'Send request' });
+        send.addEventListener('click', function () {
+            ft.setError(''); fd.setError(''); msg.textContent = ''; send.disabled = true;
+            api('/api/library', 'POST', { action: 'request_bot', title: title.value, details: details.value }).then(function (r) {
+                send.disabled = false;
+                if (r.requests) { toast('Request sent.'); route(); return; }
+                if (r.fields && r.fields.title) ft.setError(r.fields.title); if (r.fields && r.fields.details) fd.setError(r.fields.details);
+                msg.textContent = r.fields ? '' : (r.error || 'Could not send the request.');
+            });
+        });
+        body.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Request a bot' }),
+            el('p', { class: 'muted', text: 'Tell us what you need and we will answer here. You can have up to ' + d.limits.open_requests + ' requests waiting at once.' }),
+            ft.wrap, fd.wrap, el('div', { class: 'row', style: 'margin-top:12px' }, [send, msg])]));
+        var list = el('div', { class: 'card' }, [el('h2', { text: 'Your requests' })]);
+        if (!d.requests.length) list.appendChild(el('p', { class: 'muted', text: 'No requests yet.' }));
+        else list.appendChild(simpleTable(['Sent', 'Request', 'Status', ''], d.requests.map(function (r) {
+            var st = REQ_STATUS[r.status] || [r.status, ''];
+            var last = r.status === 'open'
+                ? el('button', { class: 'btn', text: 'Cancel', onclick: function () {
+                    if (!confirm('Cancel this request?')) return;
+                    api('/api/library', 'POST', { action: 'cancel_request', id: r.id }).then(function (x) { if (x.requests) { toast('Request cancelled.'); route(); } else toast(x.error || 'Could not cancel.'); }); } })
+                : (r.admin_note || '');
+            return [fmtDate(r.created_at), el('div', {}, [el('b', { text: r.title }), el('div', { class: 'muted small', text: r.details })]), pill(st[0], st[1]), last];
+        })));
+        body.appendChild(list);
+    }
+
+    function strategiesView() {
+        var v = el('div');
+        v.appendChild(head('Algorithm marketplace', 'Strategies', 'Upload strategy documents that visitors of your site can download.'));
+        var body = el('div', {}, [el('p', { class: 'muted', text: 'Loading…' })]);
+        v.appendChild(body);
+        loadLibrary(v, body, function (d) {
+            var title = box('Title', el('input', { type: 'text', name: 'title', maxlength: '120', autocomplete: 'off' }));
+            var desc = box('Short description (optional)', el('textarea', { name: 'description', maxlength: '2000' }));
+            var file = box('Document', el('input', { type: 'file', name: 'file', accept: '.pdf,.docx,.xlsx,.pptx,.png,.jpg,.jpeg,.txt' }),
+                'PDF, Word, Excel, PowerPoint, PNG, JPG or text. Up to ' + d.limits.file_mb + ' MB.');
+            var msg = el('div', { class: 'err' });
+            var up = el('button', { class: 'btn primary', text: 'Upload' });
+            var card = el('div', { class: 'card' }, [el('h2', { text: 'Add a document' }), title.wrap, desc.wrap, file.wrap]);
+            if (!d.storage_ready) { up.disabled = true; card.appendChild(el('div', { class: 'notice', text: 'Uploads are not switched on yet. Please contact support.' })); }
+            up.addEventListener('click', function () {
+                [title, desc, file].forEach(function (x) { x.setError(''); }); msg.textContent = '';
+                var f = file.input.files && file.input.files[0];
+                if (!f) { file.setError('Choose a file.'); return; }
+                if (f.size > d.limits.file_mb * 1048576) { file.setError('That file is too big (limit ' + d.limits.file_mb + ' MB).'); return; }
+                up.disabled = true; up.textContent = 'Uploading…';
+                readFile(f, true).then(function (b64) {
+                    return api('/api/library', 'POST', { action: 'add_strategy', title: title.input.value, description: desc.input.value, file_name: f.name, file_base64: b64 });
+                }).then(function (r) {
+                    up.disabled = false; up.textContent = 'Upload';
+                    if (r.strategies) { toast('Document added.'); route(); return; }
+                    var fe = r.fields || {};
+                    if (fe.title) title.setError(fe.title); if (fe.file) file.setError(fe.file);
+                    msg.textContent = r.fields ? '' : (r.error || 'Could not upload the document.');
+                }).catch(function () { up.disabled = false; up.textContent = 'Upload'; msg.textContent = 'Could not read that file.'; });
+            });
+            card.appendChild(el('div', { class: 'row', style: 'margin-top:12px' }, [up, msg]));
+            body.appendChild(card);
+
+            var list = el('div', { class: 'card' }, [el('h2', { text: 'Your documents' })]);
+            if (!d.strategies.length) list.appendChild(el('p', { class: 'muted', text: 'You have not added any documents yet.' }));
+            else list.appendChild(simpleTable(['Document', 'File', 'Added', 'Status', ''], d.strategies.map(function (s) {
+                var st = LIB_STATUS[s.status] || [s.status, ''];
+                return [el('div', {}, [el('b', { text: s.title }), s.description ? el('div', { class: 'muted small', text: s.description }) : null]),
+                    el('div', {}, [s.url ? el('a', { href: s.url, target: '_blank', rel: 'noopener noreferrer', text: s.file_name }) : document.createTextNode(s.file_name), el('div', { class: 'muted small', text: sizeText(s.size_bytes) })]),
+                    fmtDate(s.created_at),
+                    el('div', {}, [pill(st[0], st[1]), s.status === 'removed' && s.removed_note ? el('div', { class: 'muted small', text: 'Reason: ' + s.removed_note }) : null]),
+                    el('button', { class: 'btn', text: 'Delete', onclick: function () {
+                        if (!confirm('Delete "' + s.title + '"? The file is deleted and visitors can no longer download it.')) return;
+                        api('/api/library', 'POST', { action: 'delete_strategy', id: s.id }).then(function (x) { if (x.strategies) { toast('Document deleted.'); route(); } else toast(x.error || 'Could not delete.'); }); } })];
+            })));
+            body.appendChild(list);
+        });
+        return v;
     }
 
     var EVENT_TEXT = {

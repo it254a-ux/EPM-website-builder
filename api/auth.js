@@ -1,6 +1,7 @@
 const { getDb } = require('./_lib/db');
 const A = require('./_lib/auth');
 const commissions = require('./_lib/commissions');
+const library = require('./_lib/library');
 
 const TERMS_VERSION = '2026-10-04';
 const send = (res, code, body) => res.status(code).json(body);
@@ -103,8 +104,10 @@ module.exports = async function handler(req, res) {
             if (!okPw) return send(res, 401, { error: 'Incorrect password.' });
             const blocker = await commissions.deleteBlocker(sql, me.id);
             if (blocker) return send(res, 409, { error: `Your account cannot be deleted yet because ${blocker}. Please contact support and we will settle it first.` });
+            const files = await library.fileUrlsForOwner(sql, me.id);
             const gone = await sql`DELETE FROM sites WHERE owner_id = ${me.id} RETURNING domain`;
             await sql`DELETE FROM owners WHERE id = ${me.id}`; // sessions go with it
+            await library.purgeFiles(files);
             await sql`INSERT INTO audit_log (owner_id, action, target, detail) VALUES (${me.id}, 'account_deleted_by_owner', ${me.email}, ${JSON.stringify({ sites_removed: gone.map(g => g.domain) })}::jsonb)`;
             res.setHeader('Set-Cookie', A.clearCookie(req));
             return send(res, 200, { ok: true });

@@ -116,3 +116,17 @@ Operators see their earnings per day and per month, and can request a withdrawal
 - Confirmed months are frozen. One open withdrawal per operator. Balance is checked in the same SQL statement that creates the request.
 - Payouts are manual: the admin sends the money, then presses **Mark paid** with a reference.
 - Accounts with money owed or a pending withdrawal cannot be deleted.
+
+## Step 4: Trading bots, strategies and bot requests
+
+Your own central bot library stays in the trading site (`free_bots`). This step adds what an operator puts on **their own site**.
+
+**Setup**
+1. Run `api/_lib/schema.sql` in Neon (adds `site_bots`, `site_strategies`, `bot_requests`). Safe to run again.
+2. For document uploads: in Vercel, open the project, go to **Storage**, create a **Blob** store and connect it to `appbuilder`. Vercel adds `BLOB_READ_WRITE_TOKEN` by itself. Redeploy. Without it the Strategies page says uploads are off; bots and requests still work.
+
+**Rules**
+- Operator bots go live at once. The admin panel (Operator bots and documents) lists everything; **Remove** needs a reason, which the operator sees. A removed bot can be put back.
+- Removing or deleting a document deletes the stored file, so its old link stops working. Deleting a site or account deletes its files too.
+- Bot files must be Deriv Bot `.xml` (no DOCTYPE/ENTITY/script). Documents: PDF, DOCX, XLSX, PPTX, PNG, JPG, TXT, up to 3 MB, and the file contents must match the type. Up to 50 bots and 50 documents per site; 5 open bot requests per operator.
+- Visitors read a site's items from `GET /api/site-library?host=<site domain>` (list) and `...&id=<bot id>` (one bot with its file). Only live items of active sites are returned, with no owner details. **The trading site still has to call this** (or read the same tables) to show them next to the central library; that change is in the `epm-botbuilder` repo and is not part of this step.

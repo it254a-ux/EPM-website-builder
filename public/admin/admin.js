@@ -34,7 +34,7 @@
         return el('div', { class: 'scroll' }, [t]);
     }
 
-    function render(sites, owners, pool, dv, cm) {
+    function render(sites, owners, pool, dv, cm, lb) {
         clear();
         app.appendChild(el('div', { class: 'row', style: 'justify-content:space-between' }, [
             el('span', { class: 'muted', text: sites.length + ' sites · ' + owners.length + ' accounts' }),
@@ -144,6 +144,49 @@
                 reqRows.length ? table(['Requested', 'Operator', 'Site', 'Amount', 'Pay to', 'Status', ''], reqRows) : el('p', { class: 'muted', text: 'No withdrawal requests yet.' })]));
         })();
 
+        // ----- Bots, documents and requests operators added -----
+        (function () {
+            var when = function (v) { return new Date(v).toLocaleString(); };
+            var reqOpen = (lb.requests || []).filter(function (r) { return r.status === 'open'; });
+            var reqRows = (lb.requests || []).map(function (r) {
+                var btns = el('div', { class: 'row' });
+                if (r.status === 'open') {
+                    btns.appendChild(el('button', { class: 'primary', text: 'Done', onclick: function () {
+                        var note = prompt('Optional note for the operator, for example where to find the bot:', '');
+                        if (note === null) return; act({ action: 'request_answer', id: r.id, status: 'done', note: note.trim() }); } }));
+                    btns.appendChild(el('button', { text: 'Decline', onclick: function () {
+                        var note = prompt('Reason (the operator sees this):', '');
+                        if (note === null || !note.trim()) return; act({ action: 'request_answer', id: r.id, status: 'declined', note: note.trim() }); } }));
+                }
+                return [when(r.created_at), (r.owner_email || '') + (r.site_domain ? ' · ' + r.site_domain : ''), el('div', {}, [el('b', { text: r.title }), el('div', { class: 'muted', text: r.details })]),
+                    el('span', { class: 'pill', text: r.status + (r.admin_note ? ' · ' + r.admin_note : '') }), btns];
+            });
+            var botRows = (lb.bots || []).map(function (b) {
+                var btn = b.status === 'live'
+                    ? el('button', { text: 'Remove', onclick: function () {
+                        var note = prompt('Why is "' + b.name + '" being removed? The operator sees this:', '');
+                        if (note === null || !note.trim()) return; act({ action: 'library_remove', kind: 'bot', id: b.id, note: note.trim() }); } })
+                    : el('button', { text: 'Put back', onclick: function () { if (confirm('Make "' + b.name + '" live again?')) act({ action: 'library_restore', kind: 'bot', id: b.id }); } });
+                return [when(b.created_at), b.site_domain + ' · ' + b.owner_email, b.name, b.market + ' · ' + b.risk_level, el('span', { class: 'pill', text: b.status + (b.removed_note ? ' · ' + b.removed_note : '') }), btn];
+            });
+            var docRows = (lb.strategies || []).map(function (t) {
+                var btn = t.status === 'live' ? el('button', { text: 'Remove', onclick: function () {
+                    var note = prompt('Why is "' + t.title + '" being removed? The file is deleted and the operator sees this reason:', '');
+                    if (note === null || !note.trim()) return; act({ action: 'library_remove', kind: 'strategy', id: t.id, note: note.trim() }); } }) : el('span', { class: 'muted', text: 'file deleted' });
+                var link = t.status === 'live' ? el('a', { href: t.blob_url, target: '_blank', rel: 'noopener noreferrer', text: t.file_name }) : document.createTextNode(t.file_name);
+                return [when(t.created_at), t.site_domain + ' · ' + t.owner_email, t.title, link, el('span', { class: 'pill', text: t.status + (t.removed_note ? ' · ' + t.removed_note : '') }), btn];
+            });
+            var intro = 'Bots go live the moment an operator adds them. Check this list and remove anything unsafe; the operator sees your reason. ' +
+                (lb.storage_ready ? 'Document uploads are on.' : 'Document uploads are OFF: add BLOB_READ_WRITE_TOKEN in Vercel (create a Blob store first) and redeploy.');
+            app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Operator bots and documents' }), el('p', { class: 'muted', text: intro }),
+                el('h2', { style: 'margin-top:8px', text: 'Bot requests (' + reqOpen.length + ' waiting)' }),
+                reqRows.length ? table(['Sent', 'From', 'Request', 'Status', ''], reqRows) : el('p', { class: 'muted', text: 'No requests yet.' }),
+                el('h2', { style: 'margin-top:16px', text: 'Bots' }),
+                botRows.length ? table(['Added', 'Site · owner', 'Bot', 'Market · risk', 'Status', ''], botRows) : el('p', { class: 'muted', text: 'No operator bots yet.' }),
+                el('h2', { style: 'margin-top:16px', text: 'Strategy documents' }),
+                docRows.length ? table(['Added', 'Site · owner', 'Title', 'File', 'Status', ''], docRows) : el('p', { class: 'muted', text: 'No documents yet.' })]));
+        })();
+
         // ----- App IDs (the pool) -----
         var tierRows = tierKeys.map(function (m) {
             var t = tierMap[m], w = waitingBy[m] || 0, st = tierState(m);
@@ -176,11 +219,11 @@
     }
 
     function load() {
-        Promise.all([api('/api/admin?resource=sites'), api('/api/admin?resource=owners'), api('/api/admin?resource=pool'), api('/api/admin?resource=deriv'), api('/api/admin?resource=commissions')]).then(function (r) {
+        Promise.all([api('/api/admin?resource=sites'), api('/api/admin?resource=owners'), api('/api/admin?resource=pool'), api('/api/admin?resource=deriv'), api('/api/admin?resource=commissions'), api('/api/admin?resource=library')]).then(function (r) {
             if (r[0].__status === 401) return login();
             if (r[0].__status === 403) { clear(); app.appendChild(el('p', { class: 'err', text: 'This account is not an admin.' })); return; }
             if (r[0].__status === 404) { clear(); app.appendChild(el('p', { class: 'err', text: 'Admin is not available on this domain.' })); return; }
-            render(r[0].sites || [], r[1].owners || [], r[2] && !r[2].error ? r[2] : { tiers: [], apps: [] }, r[3] && !r[3].error ? r[3] : { enabled: false, configured: false, missing: [] }, r[4] && !r[4].error ? r[4] : { configured: false, months: [], requests: [] });
+            render(r[0].sites || [], r[1].owners || [], r[2] && !r[2].error ? r[2] : { tiers: [], apps: [] }, r[3] && !r[3].error ? r[3] : { enabled: false, configured: false, missing: [] }, r[4] && !r[4].error ? r[4] : { configured: false, months: [], requests: [] }, r[5] && !r[5].error ? r[5] : { bots: [], strategies: [], requests: [], storage_ready: false });
         });
     }
     load();

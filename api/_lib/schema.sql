@@ -153,3 +153,52 @@ CREATE TABLE IF NOT EXISTS payout_requests (
 CREATE INDEX IF NOT EXISTS payout_requests_owner_idx ON payout_requests (owner_id, id DESC);
 -- One open request per operator at a time: also stops a double click from asking twice.
 CREATE UNIQUE INDEX IF NOT EXISTS payout_one_open_idx ON payout_requests (owner_id) WHERE status = 'requested';
+
+-- ===== Step 4: bots, strategies, bot requests =====
+-- Your own central library stays in the trading site (free_bots). These are the extras an operator adds for THEIR site.
+CREATE TABLE IF NOT EXISTS site_bots (
+    id            SERIAL PRIMARY KEY,
+    site_id       INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    owner_id      INTEGER NOT NULL REFERENCES owners(id) ON DELETE CASCADE,
+    name          TEXT NOT NULL,
+    description   TEXT NOT NULL,
+    market        TEXT NOT NULL,
+    risk_level    TEXT NOT NULL,
+    contract_type TEXT NOT NULL DEFAULT 'Other',
+    xml_content   TEXT NOT NULL,
+    status        TEXT NOT NULL DEFAULT 'live',      -- live | removed (removed by you; the operator sees why)
+    removed_note  TEXT,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at    TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS site_bots_site_idx ON site_bots (site_id, status);
+
+CREATE TABLE IF NOT EXISTS site_strategies (
+    id           SERIAL PRIMARY KEY,
+    site_id      INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    owner_id     INTEGER NOT NULL REFERENCES owners(id) ON DELETE CASCADE,
+    title        TEXT NOT NULL,
+    description  TEXT NOT NULL DEFAULT '',
+    file_name    TEXT NOT NULL,
+    mime         TEXT NOT NULL,
+    size_bytes   INTEGER NOT NULL,
+    blob_url     TEXT NOT NULL,                      -- public link in Vercel Blob (unguessable)
+    status       TEXT NOT NULL DEFAULT 'live',       -- live | removed
+    removed_note TEXT,
+    created_at   TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS site_strategies_site_idx ON site_strategies (site_id, status);
+
+-- "Request a bot": an operator asks you to build one.
+CREATE TABLE IF NOT EXISTS bot_requests (
+    id         SERIAL PRIMARY KEY,
+    owner_id   INTEGER NOT NULL REFERENCES owners(id) ON DELETE CASCADE,
+    site_id    INTEGER REFERENCES sites(id) ON DELETE SET NULL,
+    title      TEXT NOT NULL,
+    details    TEXT NOT NULL,
+    status     TEXT NOT NULL DEFAULT 'open',         -- open | done | declined | cancelled
+    admin_note TEXT,
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    decided_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS bot_requests_owner_idx ON bot_requests (owner_id, id DESC);

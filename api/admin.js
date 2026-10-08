@@ -6,6 +6,7 @@ const { assignFromPool, assignWaiting } = require('./_lib/app-pool');
 const deriv = require('./_lib/deriv-apps');
 const { provisionApp, syncAppToDeriv, reasonOf } = require('./_lib/site-app');
 const C = require('./_lib/commissions');
+const L = require('./_lib/library');
 
 const send = (res, code, body) => res.status(code).json(body);
 const n = v => (v === undefined ? null : v);
@@ -24,8 +25,8 @@ const audit = (sql, adminId, action, target, detail) =>
 //   2. needs a valid session whose account has role 'admin' (created only by scripts/create-admin.js)
 //   3. state-changing calls must come from the same site (no cross-site posts)
 //
-//   GET  /api/admin?resource=sites | owners | audit | pool | deriv | commissions
-//   POST /api/admin  { action: set_status | update_site | approve_custom | create_app | deriv_test | commission_sync | confirm_month | payout_paid | payout_reject | set_app_id | set_markup | pool_add | pool_remove | assign_from_pool | set_rate | disable_owner | delete_site | delete_owner, ... }
+//   GET  /api/admin?resource=sites | owners | audit | pool | deriv | commissions | library
+//   POST /api/admin  { action: set_status | update_site | approve_custom | create_app | deriv_test | commission_sync | confirm_month | payout_paid | payout_reject | library_remove | library_restore | request_answer | set_app_id | set_markup | pool_add | pool_remove | assign_from_pool | set_rate | disable_owner | delete_site | delete_owner, ... }
 module.exports = async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store');
     if (!A.onPlatformHost(req, 'strict')) return send(res, 404, { error: 'Not found' });
@@ -65,6 +66,7 @@ module.exports = async function handler(req, res) {
                 return send(res, 200, { enabled: deriv.isEnabled(), configured: deriv.isConfigured(), missing: deriv.missingSettings() });
             }
             if (resource === 'commissions') return send(res, 200, await C.adminView(sql));
+            if (resource === 'library') return send(res, 200, await L.adminView(sql));
             if (resource === 'owners') {
                 const rows = await sql`SELECT id, email, name, role, disabled, created_at FROM owners ORDER BY created_at DESC LIMIT 500`;
                 return send(res, 200, { owners: rows });
@@ -310,7 +312,9 @@ module.exports = async function handler(req, res) {
             case 'delete_site': {
                 const site = (await sql`SELECT id, domain, name, plan, owner_id FROM sites WHERE id = ${siteId} LIMIT 1`)[0];
                 if (!site) return send(res, 404, { error: 'Site not found.' });
+                const files = await L.fileUrlsForSite(sql, siteId);
                 await sql`DELETE FROM sites WHERE id = ${siteId}`;
+                await L.purgeFiles(files);
                 await audit(sql, me.id, 'delete_site', siteId, { domain: site.domain, name: site.name, plan: site.plan });
                 return send(res, 200, { ok: true });
             }
@@ -324,8 +328,10 @@ module.exports = async function handler(req, res) {
                 if (owner.role !== 'operator') return send(res, 400, { error: 'Only operator accounts can be deleted here.' });
                 const blocker = await C.deleteBlocker(sql, ownerId);
                 if (blocker) return send(res, 409, { error: `This account cannot be deleted yet: ${blocker}. Pay out or reject it first.` });
+                const files = await L.fileUrlsForOwner(sql, ownerId);
                 const gone = await sql`DELETE FROM sites WHERE owner_id = ${ownerId} RETURNING domain`;
                 await sql`DELETE FROM owners WHERE id = ${ownerId}`; // sessions go with it (ON DELETE CASCADE)
+                await L.purgeFiles(files);
                 await audit(sql, me.id, 'delete_owner', ownerId, { email: owner.email, sites_removed: gone.map(g => g.domain) });
                 return send(res, 200, { ok: true, sites_removed: gone.length });
             }
@@ -339,6 +345,41 @@ module.exports = async function handler(req, res) {
                 if (disabled) await sql`DELETE FROM sessions WHERE owner_id = ${ownerId}`;
                 await audit(sql, me.id, 'disable_owner', ownerId, { disabled });
                 return send(res, 200, { ok: true });
+            }
+
+            // Bots and strategy documents operators put on their own site. Bots are live at once; this is where you take one down.
+            case 'library_remove': {
+                const id = Number(body.id) || 0;
+                const note = L.clean(body.note, L.LIMITS.note);
+                if (!note) return send(res, 400, { error: 'Write a short reason. The operator will see it.' });
+                if (body.kind === 'bot') {
+                    const r = await sql`UPDATE site_bots SET status = 'removed', removed_note = ${note}, updated_at = now() WHERE id = ${id} AND status = 'live' RETURNING id`;
+                    if (!r.length) return send(res, 404, { error: 'That bot is not live.' });
+                } else if (body.kind === 'strategy') {
+                    const r = await sql`UPDATE site_strategies SET status = 'removed', removed_note = ${note} WHERE id = ${id} AND status = 'live' RETURNING id, blob_url`;
+                    if (!r.length) return send(res, 404, { error: 'That document is not live.' });
+                    await L.purgeFiles([r[0].blob_url]); // the file itself is deleted, so the old link stops working
+                } else return send(res, 400, { error: 'Unknown item.' });
+                await audit(sql, me.id, 'library_remove', `${body.kind}:${id}`, { note });
+                return send(res, 200, await L.adminView(sql));
+            }
+
+            case 'library_restore': {
+                if (body.kind !== 'bot') return send(res, 400, { error: 'Only bots can be put back. Ask the operator to upload the document again.' });
+                const r = await sql`UPDATE site_bots SET status = 'live', removed_note = NULL, updated_at = now() WHERE id = ${Number(body.id) || 0} AND status = 'removed' RETURNING id`;
+                if (!r.length) return send(res, 404, { error: 'That bot is not removed.' });
+                await audit(sql, me.id, 'library_restore', `bot:${r[0].id}`, {});
+                return send(res, 200, await L.adminView(sql));
+            }
+
+            case 'request_answer': {
+                if (!['done', 'declined'].includes(body.status)) return send(res, 400, { error: 'Choose done or declined.' });
+                const note = L.clean(body.note, L.LIMITS.note);
+                if (body.status === 'declined' && !note) return send(res, 400, { error: 'Write a short reason. The operator will see it.' });
+                const r = await sql`UPDATE bot_requests SET status = ${body.status}, admin_note = ${note || null}, decided_at = now() WHERE id = ${Number(body.id) || 0} AND status = 'open' RETURNING id`;
+                if (!r.length) return send(res, 404, { error: 'That request is not open.' });
+                await audit(sql, me.id, 'request_answer', r[0].id, { status: body.status });
+                return send(res, 200, await L.adminView(sql));
             }
 
             default:
