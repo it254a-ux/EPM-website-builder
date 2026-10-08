@@ -171,7 +171,7 @@
     /* ---------- shell ---------- */
     var NAV = [
         ['sites', 'Sites', 'grid'], ['domains', 'Domains', 'globe'], ['deployments', 'Deployments', 'send'],
-        ['commissions', 'Commissions', 'cash', true], ['bots', 'Trading bots', 'bot', true], ['strategies', 'Strategies', 'file', true],
+        ['commissions', 'Commissions', 'cash'], ['bots', 'Trading bots', 'bot', true], ['strategies', 'Strategies', 'file', true],
         ['support', 'Support', 'help'], ['settings', 'Settings', 'sliders'],
     ];
     function mountShell() {
@@ -201,7 +201,7 @@
         var views = {
             'sites': sitesView, 'sites/new': function () { return siteForm(true); }, 'sites/edit': function () { return siteForm(false); },
             'domains': domainsView, 'deployments': deploymentsView, 'support': supportView, 'settings': settingsView,
-            'commissions': function () { return soon('Revenue streams', 'Commissions', 'Your earnings, history and withdrawals will appear here once commission tracking launches. Your agreed share is set out in your agreement with EPM.'); },
+            'commissions': commissionsView,
             'bots': function () { return soon('Algorithm marketplace', 'Trading bots', 'Browse the central bot library and upload your own bots for your site. Coming soon.'); },
             'strategies': function () { return soon('Algorithm marketplace', 'Strategies', 'Upload strategy documents for your clients to download. Coming soon.'); },
         };
@@ -426,6 +426,139 @@
         return v;
     }
 
+    /* ---------- commissions ---------- */
+    // Shows only the operator's own earnings in US dollars. The server never sends markup, volume or either share.
+    function usd(n) { return '$' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+    function monthName(m) { try { return new Date(m + '-01T00:00:00Z').toLocaleString([], { month: 'long', year: 'numeric', timeZone: 'UTC' }); } catch (e) { return m; } }
+    function dayName(d) { try { return new Date(d + 'T00:00:00Z').toLocaleDateString([], { dateStyle: 'medium', timeZone: 'UTC' }); } catch (e) { return d; } }
+    function statBox(label, value) { return el('div', { class: 'stat' }, [el('small', { text: label }), el('b', { text: value })]); }
+    function simpleTable(headers, rows) {
+        var t = el('table', {}, [el('tr', {}, headers.map(function (h) { return el('th', { text: h }); }))]);
+        rows.forEach(function (cells) { t.appendChild(el('tr', {}, cells.map(function (c) { return el('td', {}, [typeof c === 'string' ? document.createTextNode(c) : c]); }))); });
+        return el('div', { style: 'overflow-x:auto' }, [t]);
+    }
+    var REQUEST_STATUS = { requested: ['Waiting for payment', 'pending'], paid: ['Paid', 'active'], rejected: ['Rejected', 'suspended'], cancelled: ['Cancelled', ''] };
+
+    function commissionsView() {
+        var v = el('div'), tab = S.commTab || 'overview';
+        v.appendChild(head('Revenue streams', 'Commissions', 'Your earnings, withdrawals and answers to common questions. Amounts are in US dollars.'));
+        var TABS = [['overview', 'Overview'], ['history', 'History'], ['withdraw', 'Withdrawal'], ['faq', 'FAQ']];
+        v.appendChild(el('div', { class: 'tabs', role: 'tablist' }, TABS.map(function (t) {
+            return el('button', { type: 'button', role: 'tab', class: 'tab' + (t[0] === tab ? ' on' : ''), 'aria-selected': t[0] === tab ? 'true' : 'false', text: t[1],
+                onclick: function () { S.commTab = t[0]; route(); } });
+        })));
+        var body = el('div', {}, [el('p', { class: 'muted', text: 'Loading…' })]);
+        v.appendChild(body);
+        api('/api/commissions').then(function (d) {
+            if (!viewEl || !viewEl.contains(v)) return; // you moved to another page meanwhile
+            clear(body);
+            if (d.error || !d.summary) { body.appendChild(el('div', { class: 'notice bad', text: d.error || 'Could not load your earnings.' })); return; }
+            ({ overview: commOverview, history: commHistory, withdraw: commWithdraw, faq: commFaq })[tab](body, d);
+        });
+        return v;
+    }
+
+    function commOverview(body, d) {
+        var s = d.summary;
+        if (!S.site) body.appendChild(el('div', { class: 'notice', text: 'Create your site first. Earnings start once clients trade through it.' }));
+        else if (!S.site.app_id) body.appendChild(el('div', { class: 'notice', text: 'Your site is waiting for its Deriv App ID. Earnings are counted once it is assigned.' }));
+        body.appendChild(el('div', { class: 'stats' }, [statBox('Available to withdraw', usd(s.available)), statBox('Awaiting Deriv payment', usd(s.pending)), statBox('Paid out', usd(s.paid))]));
+        body.appendChild(el('div', { class: 'stats' }, [
+            statBox('This month (' + monthName(s.this_month_label) + ')', usd(s.this_month)),
+            statBox(s.latest_day ? 'Latest day (' + dayName(s.latest_day) + ')' : 'Latest day', usd(s.latest_day_amount)),
+            statBox('Withdrawal requested', usd(s.requested))]));
+        var card = el('div', { class: 'card' }, [el('h2', { text: 'How your earnings work' }),
+            el('p', { class: 'muted', text: 'Your earnings come from your clients’ trading on your site and are updated once a day. A month’s earnings stay under "Awaiting Deriv payment" until Deriv has paid that month and we have confirmed it. Then they move to "Available to withdraw".' }),
+            el('p', { class: 'muted small', text: s.last_updated ? 'Last updated ' + fmtDate(s.last_updated) + '.' : 'No earnings have been recorded yet.' }),
+            el('button', { type: 'button', class: 'btn primary', text: 'Request a withdrawal', onclick: function () { S.commTab = 'withdraw'; route(); } })]);
+        body.appendChild(card);
+    }
+
+    function commHistory(body, d) {
+        var months = el('div', { class: 'card' }, [el('h2', { text: 'By month' })]);
+        if (!d.months.length) months.appendChild(el('p', { class: 'muted', text: 'Nothing recorded yet. Your months will be listed here.' }));
+        else months.appendChild(simpleTable(['Month', 'Earned', 'Status'], d.months.map(function (m) {
+            return [monthName(m.month), usd(m.amount), pill(m.confirmed ? 'Confirmed' : 'Awaiting Deriv payment', m.confirmed ? 'active' : 'pending')];
+        })));
+        body.appendChild(months);
+        var days = el('div', { class: 'card' }, [el('h2', { text: 'Daily earnings' }), el('p', { class: 'muted small', text: 'The last 90 days with earnings.' })]);
+        if (!d.days.length) days.appendChild(el('p', { class: 'muted', text: 'No daily earnings yet.' }));
+        else days.appendChild(simpleTable(['Day', 'Earned'], d.days.map(function (x) { return [dayName(x.day), usd(x.amount)]; })));
+        body.appendChild(days);
+    }
+
+    function commWithdraw(body, d) {
+        var s = d.summary, open = d.requests.filter(function (r) { return r.status === 'requested'; })[0];
+        var amount = el('input', { type: 'text', name: 'amount', inputmode: 'decimal', autocomplete: 'off', placeholder: 'e.g. 25.00' });
+        var method = el('select', { name: 'method' }, [el('option', { value: 'mpesa', text: 'M-Pesa' }), el('option', { value: 'usdt', text: 'USDT' })]);
+        var network = el('select', { name: 'network' }, [el('option', { value: '', text: 'Choose the network' }), el('option', { value: 'TRC20', text: 'TRC20 (Tron)' }), el('option', { value: 'ERC20', text: 'ERC20 (Ethereum)' }), el('option', { value: 'BEP20', text: 'BEP20 (BNB Smart Chain)' })]);
+        var dest = el('input', { type: 'text', name: 'destination', autocomplete: 'off', spellcheck: 'false' });
+        var errs = {}, wraps = {};
+        function fieldBox(key, label, input, hint) {
+            errs[key] = el('div', { class: 'err' });
+            wraps[key] = el('div', {}, [el('label', { text: label }), input, hint ? el('div', { class: 'muted small', text: hint }) : null, errs[key]]);
+            return wraps[key];
+        }
+        var form = el('div', { class: 'card' }, [el('h2', { text: 'Request a withdrawal' }),
+            el('p', { class: 'muted', text: 'Available to withdraw: ' + usd(s.available) + '. The smallest withdrawal is ' + usd(d.min_withdrawal) + '. You can have one request waiting at a time.' }),
+            fieldBox('amount', 'Amount (US dollars)', amount), fieldBox('method', 'Pay me by', method),
+            fieldBox('network', 'USDT network', network, 'Pick the network your wallet uses. A wrong network can lose the money.'),
+            fieldBox('destination', 'M-Pesa number', dest)]);
+        function sync() {
+            var usdt = method.value === 'usdt';
+            wraps.network.classList.toggle('hidden', !usdt);
+            wraps.destination.querySelector('label').textContent = usdt ? 'Wallet address' : 'M-Pesa number';
+            dest.setAttribute('placeholder', usdt ? 'Your USDT wallet address' : 'e.g. 0712 345 678');
+        }
+        method.addEventListener('change', sync); sync();
+        var msg = el('div', { class: 'err' });
+        var send = el('button', { class: 'btn primary', text: 'Request withdrawal' });
+        if (open) { send.disabled = true; form.appendChild(el('div', { class: 'notice', text: 'You already have a request waiting. You can ask again once it is paid, or cancel it below.' })); }
+        else if (s.available < d.min_withdrawal) { send.disabled = true; form.appendChild(el('div', { class: 'notice', text: 'You have nothing to withdraw yet. Earnings become available after Deriv has paid the month and we have confirmed it.' })); }
+        send.addEventListener('click', function () {
+            msg.textContent = ''; Object.keys(errs).forEach(function (k) { errs[k].textContent = ''; });
+            send.disabled = true;
+            api('/api/commissions', 'POST', { action: 'withdraw', amount: amount.value, method: method.value, network: method.value === 'usdt' ? network.value : undefined, destination: dest.value }).then(function (r) {
+                send.disabled = false;
+                if (r.summary) { toast('Withdrawal requested.'); route(); return; }
+                Object.keys(r.fields || {}).forEach(function (k) { if (errs[k]) errs[k].textContent = r.fields[k]; });
+                msg.textContent = r.fields ? '' : (r.error || 'Could not send the request.');
+            });
+        });
+        form.appendChild(el('div', { class: 'row', style: 'margin-top:12px' }, [send, msg]));
+        body.appendChild(form);
+
+        var list = el('div', { class: 'card' }, [el('h2', { text: 'Your withdrawals' })]);
+        if (!d.requests.length) list.appendChild(el('p', { class: 'muted', text: 'No withdrawals yet.' }));
+        else list.appendChild(simpleTable(['Requested', 'Amount', 'To', 'Status', 'Details'], d.requests.map(function (r) {
+            var st = REQUEST_STATUS[r.status] || [r.status, ''];
+            var detail = r.status === 'paid' ? ('Reference ' + r.reference) : r.status === 'rejected' ? (r.note || 'Not approved. Contact support.') : '';
+            var cell = r.status === 'requested'
+                ? el('button', { class: 'btn', text: 'Cancel', onclick: function () {
+                    if (!confirm('Cancel this withdrawal request?')) return;
+                    api('/api/commissions', 'POST', { action: 'cancel', id: r.id }).then(function (x) { if (x.summary) { toast('Request cancelled.'); route(); } else toast(x.error || 'Could not cancel.'); }); } })
+                : detail;
+            return [fmtDate(r.created_at), usd(r.amount), (r.method === 'mpesa' ? 'M-Pesa ' : 'USDT ' + r.network + ' ') + r.destination, pill(st[0], st[1]), cell];
+        })));
+        body.appendChild(list);
+    }
+
+    function commFaq(body, d) {
+        var items = [
+            ['How are my earnings worked out?', 'You earn your agreed share of the markup your clients’ trades generate on your site’s own Deriv app. Your share is set out in your agreement with EPM. Amounts are in US dollars and are updated once a day.'],
+            ['Why is some money "Awaiting Deriv payment"?', 'Deriv pays partner commission monthly. A month’s earnings become available to withdraw once Deriv has paid that month and EPM has confirmed it. Until then the figures can still change.'],
+            ['How do I get paid?', 'Open the Withdrawal tab, choose M-Pesa or USDT, and send a request. We check it and pay it out, then show the M-Pesa code or transaction hash next to your request.'],
+            ['What is the smallest withdrawal?', 'The smallest withdrawal is ' + usd(d.min_withdrawal) + '. You can have one request waiting at a time.'],
+            ['Which currency will I receive?', 'Amounts here are in US dollars. Ask us on WhatsApp which exchange rate applies to M-Pesa payouts.'],
+            ['Why do I see no earnings?', 'Earnings are counted once your site has its own Deriv App ID and your clients trade through it. Check the Sites page for your App ID.'],
+            ['Are my earnings guaranteed?', 'No. They depend on your clients’ trading and on Deriv’s reports, and trading carries a high risk of loss. Never promise profits to your clients.'],
+        ];
+        var faq = el('div', { class: 'card' }, [el('h2', { text: 'Commission questions' })]);
+        items.forEach(function (q) { faq.appendChild(el('details', {}, [el('summary', { text: q[0] }), el('p', { text: q[1] })])); });
+        body.appendChild(faq);
+        body.appendChild(supportBanner());
+    }
+
     var EVENT_TEXT = {
         site_created: function (d) { return 'Site created' + (d && d.domain ? ' at ' + d.domain : ''); },
         custom_domain_requested: function (d) { return 'Own domain requested' + (d && d.domain ? ': ' + d.domain : ''); },
@@ -466,7 +599,7 @@
         ['How do I create a site?', 'Open Sites, choose Create new site, pick a free address or your own domain, and add your branding. A free address goes live immediately.'],
         ['How do I connect my own domain?', 'Open Domains, enter your domain and send the request, then add the DNS record shown. We review and activate it, and the Deployments page shows the progress.'],
         ['How is commission shared?', 'Your share of commission is set out in your agreement with EPM. If you are unsure of it, ask us on WhatsApp.'],
-        ['When do I get paid?', 'Commission accrues through the month. After Deriv\u2019s monthly partner payment has been received and reconciled, your share is paid out. Earnings and withdrawals will appear under Commissions once they launch.'],
+        ['When do I get paid?', 'Your earnings are updated once a day under Commissions. After Deriv\u2019s monthly partner payment for a month has been received and confirmed, that month\u2019s earnings become available and you can request a withdrawal to M-Pesa or USDT.'],
         ['Who supports my clients?', 'On a free address, the platform handles client support. On your own domain, you handle it with the contacts you set when editing your site.'],
         ['Is trading risky?', 'Yes. Trading on Deriv carries a high risk of loss and commission is not guaranteed. Never promise profits to your clients.'],
     ];

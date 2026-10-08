@@ -107,3 +107,49 @@ CREATE INDEX IF NOT EXISTS app_pool_free_idx ON app_pool (markup_percent, id) WH
 -- 'api' = created for the site through Deriv's API (its markup/redirect are then kept in step automatically);
 -- 'creating' = being created right now; NULL = pool or hand-assigned.
 ALTER TABLE sites ADD COLUMN IF NOT EXISTS app_source TEXT;
+
+-- ===== Step 3: commissions =====
+-- One row per Deriv app per UTC day, filled from Deriv's markup statistics (api/_lib/commissions.js).
+-- markup_usd and platform_share are for the admin only: operators are only ever shown owner_usd.
+CREATE TABLE IF NOT EXISTS commission_daily (
+    id             SERIAL PRIMARY KEY,
+    app_id         TEXT NOT NULL,
+    day            DATE NOT NULL,
+    site_id        INTEGER REFERENCES sites(id) ON DELETE SET NULL,
+    owner_id       INTEGER REFERENCES owners(id) ON DELETE SET NULL,
+    markup_usd     NUMERIC(14,4) NOT NULL,         -- what Deriv attributes to the app that day
+    volume_usd     NUMERIC(16,2) NOT NULL DEFAULT 0,
+    contracts      INTEGER NOT NULL DEFAULT 0,
+    clients        INTEGER NOT NULL DEFAULT 0,
+    platform_share NUMERIC(5,2) NOT NULL,          -- percent the platform kept, as agreed on that day
+    owner_usd      NUMERIC(14,4) NOT NULL,         -- the operator's part
+    synced_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (app_id, day)
+);
+CREATE INDEX IF NOT EXISTS commission_daily_owner_idx ON commission_daily (owner_id, day);
+
+-- A month is "confirmed" once Deriv has paid it to you. Only confirmed months can be withdrawn.
+CREATE TABLE IF NOT EXISTS commission_months (
+    month        TEXT PRIMARY KEY,                 -- 'YYYY-MM'
+    confirmed_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    confirmed_by INTEGER,
+    note         TEXT
+);
+
+-- Withdrawal requests. You pay them by hand (M-Pesa or USDT), then mark them paid with the reference.
+CREATE TABLE IF NOT EXISTS payout_requests (
+    id          SERIAL PRIMARY KEY,
+    owner_id    INTEGER NOT NULL REFERENCES owners(id) ON DELETE CASCADE,
+    amount_usd  NUMERIC(12,2) NOT NULL CHECK (amount_usd > 0),
+    method      TEXT NOT NULL CHECK (method IN ('mpesa', 'usdt')),
+    network     TEXT,                              -- USDT only: TRC20, ERC20 or BEP20
+    destination TEXT NOT NULL,                     -- phone as 2547xxxxxxxx, or a wallet address
+    status      TEXT NOT NULL DEFAULT 'requested', -- requested | paid | rejected | cancelled
+    reference   TEXT,                              -- M-Pesa code or transaction hash, set when paid
+    note        TEXT,                              -- reason shown to the operator when rejected
+    created_at  TIMESTAMPTZ NOT NULL DEFAULT now(),
+    decided_at  TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS payout_requests_owner_idx ON payout_requests (owner_id, id DESC);
+-- One open request per operator at a time: also stops a double click from asking twice.
+CREATE UNIQUE INDEX IF NOT EXISTS payout_one_open_idx ON payout_requests (owner_id) WHERE status = 'requested';

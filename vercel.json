@@ -31,5 +31,11 @@
         }
       ]
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron-commissions",
+      "schedule": "0 3 * * *"
+    }
   ]
 }

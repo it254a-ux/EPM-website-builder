@@ -95,3 +95,24 @@ against a live account and stays off unless you set `DERIV_AUTO_CREATE=1`.
 | `DERIV_REDIRECT_PATH` | Path added to a custom domain, default `/`. |
 | `DERIV_APP_SCOPES` | Default `read,trade,trading_information`. |
 | `DERIV_WS_URL` / `DERIV_WS_APP_ID` | Override the socket address / the id used to open it. |
+
+## Step 3: Commissions and withdrawals
+
+Operators see their earnings per day and per month, and can request a withdrawal. Deriv pays monthly; a month only counts as withdrawable after an admin presses **Confirm Deriv paid** for it.
+
+**Setup**
+1. Run `api/_lib/schema.sql` in Neon (adds `commission_daily`, `commission_months`, `payout_requests`). Safe to run again.
+2. Add these in Vercel, then redeploy:
+   - `DERIV_STATS_TOKEN`: Deriv token with the `application_read` scope (paste it in Vercel only).
+   - `DERIV_STATS_APP_ID`: optional, sent as the `Deriv-App-ID` header.
+   - `CRON_SECRET`: any long random string. The daily sync (`/api/cron-commissions`, 03:00 UTC, see `vercel.json`) refuses to run without it.
+   - `WITHDRAWAL_MIN_USD`: optional, default 10.
+   - `DERIV_API_BASE`: optional, default `https://api.derivws.com`.
+3. Admin panel > Commissions: "Sync from Deriv" pulls up to 10 days by hand.
+
+**Rules**
+- Earnings come from Deriv's markup report split per app, so each site's income is its own app's markup.
+- Operators never see markup, volume or the platform share.
+- Confirmed months are frozen. One open withdrawal per operator. Balance is checked in the same SQL statement that creates the request.
+- Payouts are manual: the admin sends the money, then presses **Mark paid** with a reference.
+- Accounts with money owed or a pending withdrawal cannot be deleted.

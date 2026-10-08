@@ -34,7 +34,7 @@
         return el('div', { class: 'scroll' }, [t]);
     }
 
-    function render(sites, owners, pool, dv) {
+    function render(sites, owners, pool, dv, cm) {
         clear();
         app.appendChild(el('div', { class: 'row', style: 'justify-content:space-between' }, [
             el('span', { class: 'muted', text: sites.length + ' sites · ' + owners.length + ' accounts' }),
@@ -99,6 +99,51 @@
 
         app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Sites' }), table(['Name', 'Domain', 'Plan', 'Status', 'You keep', 'Markup', 'App ID', 'Owner', 'Actions'], siteRows)]));
 
+        // ----- Commissions -----
+        (function () {
+            function usd(n) { return '$' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+            var cmMsg = el('div', { class: 'muted' });
+            var today = new Date().toISOString().slice(0, 10);
+            var from = el('input', { type: 'date', max: today, value: today }), to = el('input', { type: 'date', max: today, value: today });
+            var syncBtn = el('button', { text: 'Sync from Deriv', onclick: function () {
+                cmMsg.textContent = 'Reading from Deriv...'; syncBtn.disabled = true;
+                api('/api/admin', 'POST', { action: 'commission_sync', from: from.value, to: to.value }).then(function (r) {
+                    syncBtn.disabled = false;
+                    if (r.error) { cmMsg.textContent = r.error; return; }
+                    var matched = 0; (r.results || []).forEach(function (x) { matched += x.matched || 0; });
+                    cmMsg.textContent = 'Done: ' + (r.results || []).length + ' day(s) read, ' + matched + ' site-day(s) stored.'; load(); }); } });
+            if (!cm.configured) syncBtn.disabled = true;
+            var intro = cm.configured
+                ? 'Earnings are read from Deriv once a day (needs CRON_SECRET in Vercel) and when you press Sync. Up to 10 days at a time.' + (cm.last_synced ? ' Last read ' + new Date(cm.last_synced).toLocaleString() + '.' : ' Nothing has been read yet.')
+                : 'Not connected. Add DERIV_STATS_TOKEN (a Deriv token with the application_read scope) in Vercel and redeploy. Optional: DERIV_STATS_APP_ID, and CRON_SECRET so the daily update runs.';
+            var thisMonth = new Date().toISOString().slice(0, 7);
+            var monthRows = (cm.months || []).map(function (m) {
+                var action = m.confirmed ? el('span', { class: 'pill', text: 'Confirmed' }) : (m.month < thisMonth ? el('button', { text: 'Confirm Deriv paid', onclick: function () {
+                    var warn = m.days_synced < m.days_in_month ? '\n\nWARNING: only ' + m.days_synced + ' of ' + m.days_in_month + ' days are synced. Sync the missing days first, because a confirmed month is frozen.' : '';
+                    if (confirm('Confirm ' + m.month + '?\n\nOnly do this after Deriv has actually paid this month to you. Operators’ part: ' + usd(m.owner_usd) + ' becomes withdrawable and the month is frozen. This cannot be undone.' + warn)) act({ action: 'confirm_month', month: m.month }); } }) : el('span', { class: 'muted', text: 'Month not over' }));
+                return [m.month, m.days_synced + ' / ' + m.days_in_month, usd(m.markup_usd), usd(m.owner_usd), usd(m.platform_usd), action];
+            });
+            var reqRows = (cm.requests || []).map(function (r) {
+                var btns = el('div', { class: 'row' });
+                if (r.status === 'requested') {
+                    btns.appendChild(el('button', { class: 'primary', text: 'Mark paid', onclick: function () {
+                        var ref = prompt('Pay ' + usd(r.amount_usd) + ' to ' + (r.method === 'mpesa' ? 'M-Pesa ' : 'USDT ' + r.network + ' ') + r.destination + '. Then enter the M-Pesa code or transaction hash:');
+                        if (ref === null) return; act({ action: 'payout_paid', id: r.id, reference: ref.trim() }); } }));
+                    btns.appendChild(el('button', { text: 'Reject', onclick: function () {
+                        var note = prompt('Reason (the operator sees this). You can leave it blank:', '');
+                        if (note === null) return; act({ action: 'payout_reject', id: r.id, note: note.trim() }); } }));
+                }
+                return [new Date(r.created_at).toLocaleString(), (r.owner_name || '') + ' ' + (r.owner_email || ''), r.site_domain || '', usd(r.amount_usd),
+                    (r.method === 'mpesa' ? 'M-Pesa ' : 'USDT ' + (r.network || '') + ' ') + r.destination, el('span', { class: 'pill', text: r.status + (r.reference ? ' · ' + r.reference : '') }), btns];
+            });
+            app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Commissions' }), el('p', { class: 'muted', text: intro }),
+                el('div', { class: 'row' }, [el('span', { class: 'muted', text: 'From' }), from, el('span', { class: 'muted', text: 'to' }), to, syncBtn, cmMsg]),
+                el('div', { style: 'height:10px' }),
+                monthRows.length ? table(['Month', 'Days synced', 'Deriv markup', 'Operators’ part', 'Your part', ''], monthRows) : el('p', { class: 'muted', text: 'No earnings stored yet.' }),
+                el('h2', { style: 'margin-top:16px', text: 'Withdrawal requests' }),
+                reqRows.length ? table(['Requested', 'Operator', 'Site', 'Amount', 'Pay to', 'Status', ''], reqRows) : el('p', { class: 'muted', text: 'No withdrawal requests yet.' })]));
+        })();
+
         // ----- App IDs (the pool) -----
         var tierRows = tierKeys.map(function (m) {
             var t = tierMap[m], w = waitingBy[m] || 0, st = tierState(m);
@@ -131,11 +176,11 @@
     }
 
     function load() {
-        Promise.all([api('/api/admin?resource=sites'), api('/api/admin?resource=owners'), api('/api/admin?resource=pool'), api('/api/admin?resource=deriv')]).then(function (r) {
+        Promise.all([api('/api/admin?resource=sites'), api('/api/admin?resource=owners'), api('/api/admin?resource=pool'), api('/api/admin?resource=deriv'), api('/api/admin?resource=commissions')]).then(function (r) {
             if (r[0].__status === 401) return login();
             if (r[0].__status === 403) { clear(); app.appendChild(el('p', { class: 'err', text: 'This account is not an admin.' })); return; }
             if (r[0].__status === 404) { clear(); app.appendChild(el('p', { class: 'err', text: 'Admin is not available on this domain.' })); return; }
-            render(r[0].sites || [], r[1].owners || [], r[2] && !r[2].error ? r[2] : { tiers: [], apps: [] }, r[3] && !r[3].error ? r[3] : { enabled: false, configured: false, missing: [] });
+            render(r[0].sites || [], r[1].owners || [], r[2] && !r[2].error ? r[2] : { tiers: [], apps: [] }, r[3] && !r[3].error ? r[3] : { enabled: false, configured: false, missing: [] }, r[4] && !r[4].error ? r[4] : { configured: false, months: [], requests: [] });
         });
     }
     load();

@@ -5,6 +5,7 @@ const { logEvent } = require('./_lib/events');
 const { assignFromPool, assignWaiting } = require('./_lib/app-pool');
 const deriv = require('./_lib/deriv-apps');
 const { provisionApp, syncAppToDeriv, reasonOf } = require('./_lib/site-app');
+const C = require('./_lib/commissions');
 
 const send = (res, code, body) => res.status(code).json(body);
 const n = v => (v === undefined ? null : v);
@@ -23,8 +24,8 @@ const audit = (sql, adminId, action, target, detail) =>
 //   2. needs a valid session whose account has role 'admin' (created only by scripts/create-admin.js)
 //   3. state-changing calls must come from the same site (no cross-site posts)
 //
-//   GET  /api/admin?resource=sites | owners | audit | pool | deriv
-//   POST /api/admin  { action: set_status | update_site | approve_custom | create_app | deriv_test | set_app_id | set_markup | pool_add | pool_remove | assign_from_pool | set_rate | disable_owner | delete_site | delete_owner, ... }
+//   GET  /api/admin?resource=sites | owners | audit | pool | deriv | commissions
+//   POST /api/admin  { action: set_status | update_site | approve_custom | create_app | deriv_test | commission_sync | confirm_month | payout_paid | payout_reject | set_app_id | set_markup | pool_add | pool_remove | assign_from_pool | set_rate | disable_owner | delete_site | delete_owner, ... }
 module.exports = async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store');
     if (!A.onPlatformHost(req, 'strict')) return send(res, 404, { error: 'Not found' });
@@ -63,6 +64,7 @@ module.exports = async function handler(req, res) {
                 // Is the optional automatic app creation on? Names only what is missing, never the token itself.
                 return send(res, 200, { enabled: deriv.isEnabled(), configured: deriv.isConfigured(), missing: deriv.missingSettings() });
             }
+            if (resource === 'commissions') return send(res, 200, await C.adminView(sql));
             if (resource === 'owners') {
                 const rows = await sql`SELECT id, email, name, role, disabled, created_at FROM owners ORDER BY created_at DESC LIMIT 500`;
                 return send(res, 200, { owners: rows });
@@ -244,6 +246,50 @@ module.exports = async function handler(req, res) {
                 return send(res, 200, { ok: true });
             }
 
+            // ---- commissions ----
+            // Reads days from Deriv (max 10 at a time, never the future). Frozen months are skipped.
+            case 'commission_sync': {
+                if (!C.isConfigured()) return send(res, 409, { error: 'Not set up yet. Add DERIV_STATS_TOKEN in Vercel.' });
+                const from = String(body.from || ''), to = String(body.to || body.from || '');
+                if (!C.isValidDay(from) || !C.isValidDay(to) || to < from) return send(res, 400, { error: 'Choose a valid start and end date.' });
+                if (to > C.todayUtc()) return send(res, 400, { error: 'The end date cannot be in the future.' });
+                if (C.addDays(from, 9) < to) return send(res, 400, { error: 'Sync at most 10 days at a time.' });
+                const results = await C.syncRange(sql, from, to);
+                await audit(sql, me.id, 'commission_sync', `${from}..${to}`, { results });
+                const failed = results.find(r => r.error);
+                if (failed) return send(res, 502, { error: `Stopped at ${failed.day}: ${failed.error}`, results });
+                return send(res, 200, { ok: true, results });
+            }
+
+            // Records that Deriv has paid this month to you. From then on its earnings can be withdrawn and are frozen.
+            case 'confirm_month': {
+                const month = String(body.month || '');
+                if (!C.isValidMonth(month)) return send(res, 400, { error: 'Not a valid month.' });
+                if (month >= C.todayUtc().slice(0, 7)) return send(res, 400, { error: 'A month can only be confirmed after it has ended.' });
+                const note = String(body.note || '').replace(/[\u0000-\u001F]/g, '').trim().slice(0, 200) || null;
+                const r = await sql`INSERT INTO commission_months (month, confirmed_by, note) VALUES (${month}, ${me.id}, ${note}) ON CONFLICT (month) DO NOTHING RETURNING month`;
+                if (!r.length) return send(res, 409, { error: 'That month is already confirmed.' });
+                await audit(sql, me.id, 'confirm_month', month, { note });
+                return send(res, 200, { ok: true });
+            }
+
+            case 'payout_paid': {
+                const reference = String(body.reference || '').trim();
+                if (!/^[A-Za-z0-9][A-Za-z0-9 _.\-]{2,99}$/.test(reference)) return send(res, 400, { error: 'Enter the M-Pesa code or transaction hash (3 to 100 letters, numbers, spaces, dots or dashes).' });
+                const r = await sql`UPDATE payout_requests SET status = 'paid', reference = ${reference}, decided_at = now() WHERE id = ${Number(body.id) || 0} AND status = 'requested' RETURNING id, owner_id, amount_usd`;
+                if (!r.length) return send(res, 404, { error: 'That request is not waiting any more.' });
+                await audit(sql, me.id, 'payout_paid', r[0].id, { owner_id: r[0].owner_id, amount_usd: Number(r[0].amount_usd), reference });
+                return send(res, 200, { ok: true });
+            }
+
+            case 'payout_reject': {
+                const note = String(body.note || '').replace(/[\u0000-\u001F]/g, '').trim().slice(0, 200) || null;
+                const r = await sql`UPDATE payout_requests SET status = 'rejected', note = ${note}, decided_at = now() WHERE id = ${Number(body.id) || 0} AND status = 'requested' RETURNING id, owner_id, amount_usd`;
+                if (!r.length) return send(res, 404, { error: 'That request is not waiting any more.' });
+                await audit(sql, me.id, 'payout_reject', r[0].id, { owner_id: r[0].owner_id, amount_usd: Number(r[0].amount_usd), note });
+                return send(res, 200, { ok: true });
+            }
+
             // Per-operator deal. null clears the override and goes back to the plan default.
             case 'set_rate': {
                 const site = await getSite();
@@ -276,6 +322,8 @@ module.exports = async function handler(req, res) {
                 const owner = (await sql`SELECT id, email, role FROM owners WHERE id = ${ownerId} LIMIT 1`)[0];
                 if (!owner) return send(res, 404, { error: 'Account not found.' });
                 if (owner.role !== 'operator') return send(res, 400, { error: 'Only operator accounts can be deleted here.' });
+                const blocker = await C.deleteBlocker(sql, ownerId);
+                if (blocker) return send(res, 409, { error: `This account cannot be deleted yet: ${blocker}. Pay out or reject it first.` });
                 const gone = await sql`DELETE FROM sites WHERE owner_id = ${ownerId} RETURNING domain`;
                 await sql`DELETE FROM owners WHERE id = ${ownerId}`; // sessions go with it (ON DELETE CASCADE)
                 await audit(sql, me.id, 'delete_owner', ownerId, { email: owner.email, sites_removed: gone.map(g => g.domain) });
