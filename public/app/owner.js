@@ -410,6 +410,56 @@
         if (cur === 'buy') {
             var q = el('input', { type: 'text', name: 'domain-search', placeholder: 'Type the name you want, e.g. mybrandtrading', autocomplete: 'off', spellcheck: 'false' });
             var out = el('div', { class: 'muted small', style: 'margin-top:12px' });
+            function checkout(d, r) {
+                var money = function (n) { return Number(n).toLocaleString('en-KE', { maximumFractionDigits: 0 }); };
+                var price = r.kes_available && d.price_kes ? 'KES ' + money(d.price_kes) : null;
+                var renew = r.kes_available && d.renewal_kes ? 'KES ' + money(d.renewal_kes) : '$' + Number(d.renewal_usd).toFixed(2);
+                clear(out);
+                if (!price) { out.appendChild(el('div', { class: 'notice bad', text: 'Shilling prices are not available right now, so buying is paused. Please try again later.' })); return; }
+                var f = { phone: field('phone', 'Your M-Pesa number', 'tel', '', 'The number that will get the payment prompt, for example 0712345678.'),
+                    first_name: field('first_name', 'First name', 'text', ''), last_name: field('last_name', 'Last name', 'text', ''),
+                    address1: field('address1', 'Street address', 'text', ''), city: field('city', 'Town or city', 'text', ''),
+                    state: field('state', 'County or region', 'text', ''), zip: field('zip', 'Postal code', 'text', '', 'Use 00100 if you are not sure.'),
+                    country: field('country', 'Country code', 'text', 'KE', 'Two letters, for example KE.') };
+                var msg = el('div', { class: 'notice', style: 'display:none' });
+                var payBtn = el('button', { class: 'btn primary', type: 'button', text: 'Pay ' + price + ' with M-Pesa' });
+                var back = el('button', { class: 'btn', type: 'button', text: 'Back', onclick: search });
+                var box = el('div', { class: 'card', style: 'margin-top:8px' }, [
+                    el('h3', { text: d.domain }),
+                    el('p', {}, [el('strong', { text: price }), ' for the first year. It renews at ', el('strong', { text: renew }), ' a year after that. We do not renew it for you: you will be reminded, and your site pauses if you do not renew.']),
+                    el('p', { class: 'muted small', text: 'The registry needs the owner\u2019s details. Use your real details.' }),
+                    f.first_name.wrap, f.last_name.wrap, f.address1.wrap, f.city.wrap, f.state.wrap, f.zip.wrap, f.country.wrap, f.phone.wrap, msg,
+                    el('div', { class: 'row' }, [payBtn, back])]);
+                out.appendChild(box);
+                function say(text, kind) { msg.style.display = text ? '' : 'none'; msg.className = 'notice ' + (kind || ''); msg.textContent = text || ''; }
+                function poll(id, tries) {
+                    api('/api/domains?order=' + id).then(function (x) {
+                        var o = x && x.order;
+                        if (!o) { say('We could not check your payment. Please refresh the page in a minute.', 'bad'); return; }
+                        if (o.status === 'completed') { say(o.message, 'ok'); toast('Domain registered'); loadSite().then(function () { setTimeout(function () { go('#/domains'); }, 1500); }); return; }
+                        if (['cancelled', 'expired', 'refund_due', 'refunded', 'check_needed'].indexOf(o.status) >= 0) { say(o.message, o.status === 'check_needed' ? '' : 'bad'); payBtn.disabled = false; return; }
+                        say(o.message);
+                        if (tries > 0) setTimeout(function () { poll(id, tries - 1); }, 4000);
+                        else { say('Still waiting. If you paid, your domain will appear under Domains within a few minutes.', ''); payBtn.disabled = false; }
+                    });
+                }
+                payBtn.addEventListener('click', function () {
+                    Object.keys(f).forEach(function (k) { f[k].setError(''); });
+                    var body = { action: 'order', domain: d.domain, phone: f.phone.input.value, contact: {} };
+                    ['first_name', 'last_name', 'address1', 'city', 'state', 'zip', 'country'].forEach(function (k) { body.contact[k] = f[k].input.value; });
+                    payBtn.disabled = true; say('Sending the payment prompt to your phone\u2026');
+                    api('/api/domains', 'POST', body).then(function (x) {
+                        if (!x || !x.order) {
+                            payBtn.disabled = false;
+                            var fl = (x && x.fields) || {};
+                            Object.keys(fl).forEach(function (k) { if (f[k]) f[k].setError(fl[k]); });
+                            say((x && x.error) || 'Something went wrong. Please try again.', 'bad'); return;
+                        }
+                        say(x.order.message);
+                        poll(x.order.id, 45);
+                    });
+                });
+            }
             function search() {
                 var name = String(q.value || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '');
                 var label = name.split('.')[0];
@@ -433,13 +483,13 @@
                             right = el('div', {}, [
                                 el('div', {}, [el('strong', { text: first }), el('span', { class: 'muted small', text: ' for the first year' + (r.kes_available ? ' (' + usd(d.price_usd) + ')' : '') })]),
                                 el('div', { class: jump ? 'err small' : 'muted small', text: 'Renews at ' + renew + ' a year after that.' }),
-                                el('button', { class: 'btn', type: 'button', disabled: 'disabled', title: 'M-Pesa payment is being connected', text: 'Buying opens soon' })]);
+                                el('button', { class: 'btn primary', type: 'button', text: 'Buy this domain', onclick: function () { checkout(d, r); } })]);
                         }
                         out.appendChild(el('div', { class: 'card', style: 'margin-top:8px' }, [el('div', { class: 'row', style: 'justify-content:space-between;align-items:center' }, [el('strong', { text: d.domain }), right])]));
                     });
                     if (!r.kes_available) out.appendChild(el('p', { class: 'muted small', text: 'Prices are shown in US dollars for now. Payment is by M-Pesa in shillings.' }));
                     if (r.rate_credit) out.appendChild(el('p', { class: 'muted small' }, ['Rates By ', el('a', { href: 'https://www.exchangerate-api.com', target: '_blank', rel: 'noopener noreferrer', text: 'Exchange Rate API' }), '.']));
-                    out.appendChild(el('p', { class: 'muted small', text: 'Nothing is charged by searching. Buying is not open yet.' }));
+                    out.appendChild(el('p', { class: 'muted small', text: 'Nothing is charged by searching. You pay by M-Pesa only after you confirm.' }));
                 });
             }
             q.addEventListener('keydown', function (e) { if (e.key === 'Enter') search(); });

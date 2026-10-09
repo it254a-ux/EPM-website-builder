@@ -212,3 +212,48 @@ CREATE TABLE IF NOT EXISTS fx_rates (
     fetched_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );
 CREATE INDEX IF NOT EXISTS fx_rates_pair_idx ON fx_rates (pair, id DESC);
+
+-- Domain purchases and renewals paid by M-Pesa. One row per attempt.
+CREATE TABLE IF NOT EXISTS domain_orders (
+    id                 SERIAL PRIMARY KEY,
+    owner_id           INTEGER NOT NULL REFERENCES owners(id) ON DELETE CASCADE,
+    site_id            INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    kind               TEXT NOT NULL DEFAULT 'purchase',        -- purchase | renewal
+    domain             TEXT NOT NULL,
+    years              INTEGER NOT NULL DEFAULT 1,
+    price_usd_cents    INTEGER NOT NULL,                        -- what the operator pays, in US cents
+    price_kes          INTEGER NOT NULL,                        -- what the operator pays, in shillings
+    cost_usd_cents     INTEGER NOT NULL,                        -- what the registrar charges you. NEVER shown to operators.
+    renewal_usd_cents  INTEGER,                                 -- the operator's price for the next renewal, shown before they pay
+    renewal_cost_cents INTEGER,                                 -- your cost for the next renewal. NEVER shown to operators.
+    fx_rate            NUMERIC(12,4),
+    phone              TEXT NOT NULL,                           -- M-Pesa number, 2547XXXXXXXX
+    contact            JSONB NOT NULL DEFAULT '{}'::jsonb,      -- registrant details the registry requires
+    status             TEXT NOT NULL DEFAULT 'awaiting_payment',
+        -- awaiting_payment | cancelled | expired | paid | buying | completed | check_needed | refund_due | refunded
+    mpesa_merchant_id  TEXT,
+    mpesa_checkout_id  TEXT,
+    mpesa_receipt      TEXT,
+    paid_kes           INTEGER,
+    vercel_order_id    TEXT,
+    attempts           INTEGER NOT NULL DEFAULT 0,
+    failure_reason     TEXT,
+    refund_reference   TEXT,
+    created_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at         TIMESTAMPTZ NOT NULL DEFAULT now(),
+    expires_at         TIMESTAMPTZ NOT NULL,
+    paid_at            TIMESTAMPTZ,
+    completed_at       TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS domain_orders_owner_idx ON domain_orders (owner_id, id DESC);
+CREATE INDEX IF NOT EXISTS domain_orders_status_idx ON domain_orders (status);
+-- One person at a time can be buying a given domain.
+CREATE UNIQUE INDEX IF NOT EXISTS domain_orders_open_idx ON domain_orders (domain) WHERE kind = 'purchase' AND status IN ('awaiting_payment', 'paid', 'buying', 'check_needed');
+-- One M-Pesa payment can only ever pay for one order.
+CREATE UNIQUE INDEX IF NOT EXISTS domain_orders_receipt_idx ON domain_orders (mpesa_receipt) WHERE mpesa_receipt IS NOT NULL;
+CREATE UNIQUE INDEX IF NOT EXISTS domain_orders_checkout_idx ON domain_orders (mpesa_checkout_id) WHERE mpesa_checkout_id IS NOT NULL;
+
+-- Domains we sold: when they expire, and whether we paused the site because of it.
+ALTER TABLE sites ADD COLUMN IF NOT EXISTS domain_bought_here BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE sites ADD COLUMN IF NOT EXISTS domain_expires_at TIMESTAMPTZ;
+ALTER TABLE sites ADD COLUMN IF NOT EXISTS domain_paused_at TIMESTAMPTZ;

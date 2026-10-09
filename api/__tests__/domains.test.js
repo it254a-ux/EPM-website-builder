@@ -75,7 +75,8 @@ test('only a signed-in operator can search', async () => {
     const adm = await login('admin', 'a@example.com');
     assert.equal((await call(domains, { query: { name: 'mybrand' }, cookie: adm.cookie })).status, 403);
     const op = await login('operator', 'o@example.com');
-    assert.equal((await call(domains, { method: 'POST', query: { name: 'mybrand' }, cookie: op.cookie })).status, 405);
+    assert.equal((await call(domains, { method: 'DELETE', query: { name: 'mybrand' }, cookie: op.cookie })).status, 405);
+    assert.equal((await call(domains, { method: 'POST', body: { action: 'nope' }, cookie: op.cookie })).status, 400);
 });
 
 test('a badly written name is refused before Vercel is asked', async () => {
