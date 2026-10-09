@@ -123,3 +123,87 @@ details{border-bottom:1px solid var(--line);padding:12px 0}details:last-child{bo
 .faq>.faq-title,.faq>.muted{grid-column:1/-1;margin-bottom:0}.faq>.muted{margin:0 0 4px}
 .faq-item{margin:0;height:100%}.faq-q{font-size:.98rem}
 @media (max-width:700px){.faq{grid-template-columns:1fr}}
+
+/* ===== Mobile polish: compact, premium phone layout (kept last so it wins) ===== */
+html{-webkit-text-size-adjust:100%;text-size-adjust:100%}
+/* Short labels and buttons never split onto two rows */
+.btn,.tab,.switch button,.linkbtn,.pwwrap button,.nav a,.pill,.dc-kicker,.fm-x{white-space:nowrap}
+.btn{max-width:100%}
+@media(max-width:600px){
+ body{font-size:14px;line-height:1.5}
+ h1,h2,h3{line-height:1.22}
+ /* buttons and fields. Inputs stay 16px: iOS zooms the whole page on focus below that */
+ .btn{padding:8px 14px;gap:6px;font-size:.84rem}
+ .btn.google{padding:10px 14px}
+ label{margin:11px 0 4px;font-size:.8rem}
+ input,select,textarea{padding:9px 12px;border-radius:9px;font-size:16px}
+ textarea{min-height:72px}
+ .pwwrap input{padding-right:58px}.pwwrap button{top:4px;font-size:.84rem}
+ .checkrow{margin:12px 0 2px;font-size:.82rem}
+ .err{font-size:.8rem}
+ /* cards */
+ .card{margin-bottom:10px;padding:14px 15px;border-radius:14px}
+ .card h2{font-size:1rem}.card h3{font-size:.94rem}
+ .pill{padding:1px 9px;font-size:.72rem}
+ .notice{margin:8px 0;padding:9px 12px;font-size:.84rem}
+ /* sign in / sign up */
+ .auth{align-items:start;gap:18px;padding:20px 14px 28px}
+ .brandmark{margin-bottom:14px;font-size:1.2rem}
+ .brandmark i{width:30px;height:30px;border-radius:9px;font-size:1rem}
+ .auth-promo h1{margin-bottom:8px;font-size:clamp(1.5rem,7vw,1.85rem)}
+ .auth-promo p{font-size:.88rem}
+ .auth-promo ul{margin-top:10px}
+ .auth-promo li{padding:4px 0 4px 22px;font-size:.86rem}
+ .auth-promo li:before{top:10px;width:8px;height:8px}
+ .auth-card{padding:18px 16px 16px}
+ .auth-card h2{font-size:1.25rem}
+ .auth-card .sub{font-size:.88rem}
+ .switch{margin-top:12px;font-size:.84rem}
+ .divider{margin:12px 0 0;font-size:.76rem}
+ .linkbtn{font-size:.84rem}
+ /* shell */
+ .top{gap:8px;padding:8px 12px}
+ .top .who{flex:1;min-width:0;margin:0;overflow:hidden;font-size:.62rem;text-align:center;text-overflow:ellipsis;white-space:nowrap}.top .who b{font-size:.84rem}
+ .menu{padding:6px 8px}.menu svg{width:18px;height:18px}
+ .side{width:240px}
+ .nav a{padding:9px 11px;font-size:.76rem}
+ #view{padding:14px 12px 44px}
+ .head{margin-bottom:12px}
+ .head .kicker{font-size:.64rem}
+ .head h1{font-size:1.45rem}
+ .head p{margin-top:4px;font-size:.88rem}
+ .banner{gap:10px;margin-bottom:12px;padding:10px 12px;font-size:.88rem}
+ .banner span{font-size:.8rem}
+ .empty{padding:22px 12px}
+ .empty .bubble{width:72px;height:72px;margin-bottom:10px}.empty .bubble svg{width:30px;height:30px}
+ .empty h2{font-size:1.3rem}
+ .empty p{margin:8px auto 14px;font-size:.88rem}
+ .stats{gap:8px;margin-bottom:10px}
+ .stat{padding:10px 13px}.stat small{font-size:.64rem}.stat b{font-size:1.45rem}
+ table{font-size:.8rem}th,td{padding:7px 6px}th{font-size:.66rem}
+ .timeline li{padding:8px 0}
+ .tabs{gap:4px;margin:4px 0 14px;padding:4px}
+ .tab{padding:7px 12px;font-size:.82rem}
+ .stepbtn{width:36px;height:36px}
+ .modal{padding:16px}.modal .box{padding:20px}
+ .toast{bottom:16px;padding:9px 16px;font-size:.84rem}
+ /* support page */
+ .design-cta{gap:12px;margin:12px 0;padding:18px;border-radius:16px}
+ .design-cta h2{font-size:1.15rem}.design-cta p{font-size:.86rem}
+ .dc-kicker{font-size:.66rem}
+ .btn.dc-btn{padding:9px 16px}
+ .faq{gap:9px}.faq-title{font-size:1.2rem}
+ .faq-item{gap:11px;padding:12px 14px;border-radius:14px}
+ .faq-ico,.fm-ico{width:34px;height:34px;border-radius:10px;font-size:1.05rem}
+ .faq-q{font-size:.9rem}.faq-chev{font-size:1.4rem}
+ .fm-head{gap:11px;padding:16px 54px 14px 16px}.fm-head h3{font-size:1.05rem}
+ .fm-x{top:12px;right:12px;width:32px;height:32px}
+ .fm-body{padding:16px 16px 20px}
+ .faq-steps li{padding:5px 0 5px 32px;font-size:.9rem}
+ .faq-tip{font-size:.84rem}
+}
+@media(max-width:360px){
+ .auth-promo h1{font-size:1.45rem}
+ .head h1{font-size:1.35rem}
+ .top .who b{font-size:.8rem}
+}

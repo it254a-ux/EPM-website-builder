@@ -4390,3 +4390,179 @@ button {
 .legal-doc li { margin-bottom: 5px; }
 .legal-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--line); }
 .legal-foot p { margin: 0; font-size: 0.82rem; }
+
+
+/* ===== Mobile polish: compact, premium phone layout =====
+   Kept last on purpose: the "Premium theme" block above would otherwise
+   override the earlier phone rules and leave headings and padding oversized. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
+@media (max-width: 600px) {
+  /* Short labels and buttons must never split onto two rows */
+  .button,
+  .text-link,
+  .text-action,
+  .signin-link,
+  .signout-link,
+  .nav-links > a,
+  .nav-mobile-account > a,
+  .nav-mobile-account > button,
+  .eyebrow,
+  .stats-inner b {
+    white-space: nowrap;
+  }
+
+  /* Header */
+  .site-header { padding: 8px 10px 0; }
+  .nav-pill { min-height: 48px; gap: 8px; padding: 5px 7px 5px 14px; border-radius: 14px; }
+  .nav-pill .brand { gap: 6px; font-size: 1.05rem; }
+  .brand-mark { width: 21px; height: 21px; }
+  .brand-mark > svg { width: 21px; height: 21px; }
+  .mobile-menu-button { width: 36px; height: 36px; border-radius: 11px; }
+  .nav-links { padding: 7px; font-size: 0.84rem; }
+  .nav-links > a { padding: 9px 10px; }
+  .nav-mobile-account { gap: 10px; padding: 9px 6px 3px; }
+  .nav-mobile-account > a,
+  .nav-mobile-account > button { font-size: 0.8rem; }
+  .nav-mobile-account .button { min-height: 34px; padding: 0.45rem 0.85rem; font-size: 0.8rem; }
+
+  /* Buttons */
+  .button { min-height: 40px; gap: 7px; padding: 0.55rem 1rem; font-size: 0.82rem; }
+  .button-large { min-height: 44px; padding: 0.65rem 1.15rem; font-size: 0.86rem; }
+  .button-full { min-height: 44px; }
+  .text-link,
+  .text-action { gap: 6px; font-size: 0.82rem; }
+
+  /* Hero */
+  .hero { width: calc(100% - 24px); gap: 6px; margin-top: 0; padding: 26px 4px 22px; }
+  .hero-copy { padding: 0 6px; }
+  .eyebrow { gap: 7px; margin-bottom: 12px; font-size: 0.6rem; letter-spacing: 0.12em; }
+  .hero h1 { font-size: clamp(1.75rem, 8vw, 2.2rem); line-height: 1.14; }
+  .hero-description { margin-top: 10px; font-size: 0.86rem; line-height: 1.6; }
+  .hero-actions { gap: 10px; margin-top: 16px; }
+  .trust-note { margin-top: 12px; font-size: 0.64rem; }
+  .preview-stage { min-height: 262px; }
+  .preview-app { min-height: 222px; }
+  .preview-chart { height: 86px; }
+
+  /* Stats band */
+  .stats-band { padding: 6px 10px; }
+  .stats-inner > div { padding: 8px 3px; }
+  .stats-inner b { font-size: 1.1rem; }
+  .stats-inner span { font-size: 0.44rem; }
+
+  /* Home sections */
+  .home-value { width: calc(100% - 28px); gap: 12px; margin: 26px auto; }
+  .home-value h2,
+  .bottom-cta h2,
+  .cta-strip h2,
+  .mission-copy h2,
+  .values-heading h2 { font-size: 1.38rem; line-height: 1.16; }
+  .home-value > div:first-child > p:not(.eyebrow) { margin: 10px 0 16px; font-size: 0.84rem; line-height: 1.6; }
+  .value-card { gap: 10px; padding: 11px 12px; }
+  .value-card .icon-box { width: 32px; height: 32px; border-radius: 10px; }
+  .value-card .icon-box svg { width: 16px; height: 16px; }
+  .value-card h3 { font-size: 0.86rem; }
+  .value-card p { font-size: 0.74rem; line-height: 1.45; }
+  .bottom-cta { width: calc(100% - 24px); gap: 12px; margin-bottom: 26px; padding: 18px; }
+  .cta-strip { gap: 12px; margin-top: 22px; padding: 17px; }
+
+  /* Inner pages */
+  .page-wrap { width: calc(100% - 28px); padding: 24px 0 30px; }
+  .page-heading { margin-bottom: 16px; }
+  .page-heading h1 { font-size: clamp(1.65rem, 7.6vw, 2rem); }
+  .page-intro { margin-top: 8px; font-size: 0.84rem; line-height: 1.6; }
+  .steps-grid,
+  .features-grid,
+  .values-grid { gap: 9px; }
+  .step-card,
+  .feature-card { padding: 15px; }
+  .step-card h2 { margin-bottom: 7px; font-size: 0.98rem; }
+  .feature-card h2 { margin-bottom: 6px; font-size: 0.96rem; }
+  .step-card p,
+  .feature-card > p:not(.feature-tag) { font-size: 0.78rem; line-height: 1.55; }
+  .step-top { margin-bottom: 12px; }
+  .step-icon { width: 36px; height: 36px; border-radius: 10px; }
+  .feature-tag { margin: 12px 0 4px; }
+  .learn-section,
+  .plans-section { margin-top: 22px; }
+  .learn-section { gap: 10px; padding: 13px; }
+  .learn-heading h2,
+  .faq-panel h2,
+  .contact-form h2 { font-size: 1.15rem; }
+  .mission-copy,
+  .mission-stat { padding: 16px; }
+  .mission-stat > b { font-size: 1.8rem; }
+
+  /* Forms. Inputs stay at 16px: iOS zooms the whole page on focus below that. */
+  .contact-form { gap: 11px; padding: 16px; }
+  .faq-panel { padding: 16px; }
+  .contact-form label,
+  .auth-form > label,
+  .wizard-form > label,
+  .settings-form > label { gap: 5px; font-size: 0.74rem; }
+  .contact-form input,
+  .contact-form textarea,
+  .auth-form input:not([type="checkbox"]),
+  .wizard-form input:not([type="color"]),
+  .settings-form input { min-height: 42px; padding: 9px 12px; font-size: 16px; }
+  .contact-form textarea { min-height: 100px; }
+
+  /* Footer */
+  .site-footer { padding: 26px 16px 12px; }
+  .footer-top { gap: 20px 14px; margin-bottom: 14px; }
+  .footer-brand-block p { margin-top: 10px; font-size: 0.74rem; line-height: 1.65; }
+  .footer-col { gap: 9px; font-size: 0.78rem; }
+  .footer-col b { margin: 4px 0 3px; font-size: 0.8rem; }
+  .footer-risk { font-size: 0.68rem; line-height: 1.55; }
+  .footer-bottom { font-size: 0.64rem; }
+
+  /* Legal pages */
+  .legal-doc { padding: 16px 14px; border-radius: 16px; }
+  .legal-doc h2 { font-size: 1.05rem; }
+  .legal-doc p,
+  .legal-doc li { font-size: 0.85rem; line-height: 1.62; }
+
+  /* Demo dashboard */
+  .dashboard-page-title h1,
+  .wizard-header h1 { font-size: 1.4rem; }
+
+  /* Public trading-site preview */
+  .public-hero { min-height: 0; padding: 36px 16px 30px; }
+  .public-hero h1 { font-size: clamp(1.8rem, 8.2vw, 2.3rem); }
+  .public-hero > p:not(.public-live-label) { font-size: 0.84rem; }
+}
+
+/* Very small phones (320 to 360px): one more step down */
+@media (max-width: 360px) {
+  .nav-pill .brand { font-size: 1rem; }
+  .hero h1 { font-size: 1.7rem; }
+  .hero-description { font-size: 0.83rem; }
+  .button-large { padding: 0.6rem 1rem; font-size: 0.82rem; }
+  .page-heading h1 { font-size: 1.6rem; }
+  .home-value h2,
+  .bottom-cta h2,
+  .cta-strip h2,
+  .mission-copy h2,
+  .values-heading h2 { font-size: 1.28rem; }
+  .stats-inner b { font-size: 1rem; }
+}
+
+/* Safety net at every width: header buttons and links keep their label on one row */
+.public-signin,
+.public-site-header nav a { white-space: nowrap; }
+.public-signin,
+.public-site-header nav { flex-shrink: 0; }
+
+@media (max-width: 600px) {
+  .public-site-header { gap: 8px; }
+  .public-brand { line-height: 1.15; }
+  .public-site-header nav { gap: 10px; font-size: 0.7rem; }
+}
+@media (max-width: 340px) {
+  /* Smallest phones: give the brand name room; the same links stay in the page body */
+  .public-site-header nav { display: none; }
+}
