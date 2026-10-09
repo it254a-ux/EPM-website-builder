@@ -234,11 +234,34 @@
         ]);
     }
 
+    function renewalBanner() {
+        var site = S.site, r = site && site.renewal;
+        if (!r || (r.state === 'ok' && !r.paused)) return null;
+        var date = new Date(r.expires_at).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' });
+        var text = r.paused ? 'Your domain ' + site.domain + ' expired on ' + date + ' and your site is paused. Renew it to bring your site back.'
+            : 'Your domain ' + site.domain + ' expires on ' + date + ' (' + r.days_left + (r.days_left === 1 ? ' day' : ' days') + ' left). Renew it to keep your site online.';
+        return el('div', { class: 'notice ' + (r.paused || r.days_left <= 7 ? 'bad' : '') }, [el('div', { text: text }),
+            el('button', { class: 'btn primary', type: 'button', text: 'Renew now', onclick: function () { S.domainTab = 'renew'; go('#/domains'); } })]);
+    }
+    function moneyText(n) { return Number(n).toLocaleString('en-KE', { maximumFractionDigits: 0 }); }
+    // Follows an order after the payment prompt is sent, until it is finished or we give up waiting.
+    function watchOrder(id, tries, say, btn) {
+        api('/api/domains?order=' + id).then(function (x) {
+            var o = x && x.order;
+            if (!o) { say('We could not check your payment. Please refresh the page in a minute.', 'bad'); return; }
+            if (o.status === 'completed') { say(o.message, 'ok'); toast(o.kind === 'renewal' ? 'Domain renewed' : 'Domain registered'); loadSite().then(function () { setTimeout(function () { S.domainTab = 'yours'; go('#/domains'); route(); }, 1500); }); return; }
+            if (['cancelled', 'expired', 'refund_due', 'refunded', 'check_needed'].indexOf(o.status) >= 0) { say(o.message, o.status === 'check_needed' ? '' : 'bad'); btn.disabled = false; return; }
+            say(o.message);
+            if (tries > 0) setTimeout(function () { watchOrder(id, tries - 1, say, btn); }, 4000);
+            else { say('Still waiting. If you paid, this page will update within a few minutes.', ''); btn.disabled = false; }
+        });
+    }
     function sitesView() {
         var v = el('div'), site = S.site;
         v.appendChild(el('div', { class: 'row between' }, [head('Welcome ' + S.owner.name.split(' ')[0], 'Your sites'),
             site ? null : el('a', { class: 'btn primary', href: '#/sites/new', text: 'Create new site' })]));
         v.appendChild(supportBanner());
+        v.appendChild(renewalBanner());
         if (!site) {
             v.appendChild(el('div', { class: 'card empty' }, [el('div', { class: 'bubble' }, [svg(ICON.store)]),
                 el('h2', {}, ['No sites yet.', el('span', { text: 'Let\u2019s build your first one!' })]),
@@ -253,7 +276,7 @@
         card.appendChild(el('p', { style: 'margin:0 0 12px' }, ['Markup ', el('b', { text: Number(site.markup_percent).toFixed(2) + '%' }), ' \u00b7 App ID ', site.app_id ? el('b', { text: site.app_id }) : pill('Awaiting assignment', 'pending')]));
         if (!site.app_id) card.appendChild(el('div', { class: 'notice', text: 'We are setting up your own Deriv app for this site. Your earnings are tracked separately once your App ID is assigned, and we will show it here.' }));
         if (site.status === 'pending') card.appendChild(el('div', { class: 'notice', text: 'Waiting for approval. Your site goes live once your domain is set up and reviewed.' }));
-        if (site.status === 'suspended') card.appendChild(el('div', { class: 'notice bad', text: 'This site is suspended. Please contact support.' }));
+        if (site.status === 'suspended' && !(site.renewal && site.renewal.paused)) card.appendChild(el('div', { class: 'notice bad', text: 'This site is suspended. Please contact support.' }));
         var actions = el('div', { class: 'row' });
         if (site.status === 'active') actions.appendChild(el('a', { class: 'btn primary', href: 'https://' + site.domain, target: '_blank', rel: 'noopener', text: 'Open site' }));
         actions.appendChild(el('a', { class: 'btn', href: '#/sites/edit', text: 'Edit details' }));
@@ -372,7 +395,11 @@
         if (!site) { v.appendChild(el('div', { class: 'card' }, [el('p', { text: 'Create a site first, then you can connect or buy a domain.' }), el('a', { class: 'btn primary', href: '#/sites/new', text: 'Create site' })])); return v; }
 
         var TABS = [['yours', 'Your address'], ['buy', 'Buy a domain'], ['own', 'Connect your own'], ['history', 'Payment history']];
+        if (site.renewal) TABS.splice(1, 0, ['renew', 'Renew']);
+        if (cur0() === 'renew' && !site.renewal) S.domainTab = 'yours';
         var cur = S.domainTab || 'yours';
+        function cur0() { return S.domainTab; }
+        v.appendChild(renewalBanner());
         var tabBar = el('div', { class: 'tabs', role: 'tablist' }, TABS.map(function (t) {
             return el('button', { type: 'button', role: 'tab', class: 'tab' + (t[0] === cur ? ' on' : ''), 'aria-selected': t[0] === cur ? 'true' : 'false', text: t[1],
                 onclick: function () { S.domainTab = t[0]; route(); } });
@@ -432,17 +459,6 @@
                     el('div', { class: 'row' }, [payBtn, back])]);
                 out.appendChild(box);
                 function say(text, kind) { msg.style.display = text ? '' : 'none'; msg.className = 'notice ' + (kind || ''); msg.textContent = text || ''; }
-                function poll(id, tries) {
-                    api('/api/domains?order=' + id).then(function (x) {
-                        var o = x && x.order;
-                        if (!o) { say('We could not check your payment. Please refresh the page in a minute.', 'bad'); return; }
-                        if (o.status === 'completed') { say(o.message, 'ok'); toast('Domain registered'); loadSite().then(function () { setTimeout(function () { go('#/domains'); }, 1500); }); return; }
-                        if (['cancelled', 'expired', 'refund_due', 'refunded', 'check_needed'].indexOf(o.status) >= 0) { say(o.message, o.status === 'check_needed' ? '' : 'bad'); payBtn.disabled = false; return; }
-                        say(o.message);
-                        if (tries > 0) setTimeout(function () { poll(id, tries - 1); }, 4000);
-                        else { say('Still waiting. If you paid, your domain will appear under Domains within a few minutes.', ''); payBtn.disabled = false; }
-                    });
-                }
                 payBtn.addEventListener('click', function () {
                     Object.keys(f).forEach(function (k) { f[k].setError(''); });
                     var body = { action: 'order', domain: d.domain, phone: f.phone.input.value, contact: {} };
@@ -456,7 +472,7 @@
                             say((x && x.error) || 'Something went wrong. Please try again.', 'bad'); return;
                         }
                         say(x.order.message);
-                        poll(x.order.id, 45);
+                        watchOrder(x.order.id, 45, say, payBtn);
                     });
                 });
             }
@@ -501,7 +517,45 @@
         }
 
         if (cur === 'history') {
-            body.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Payment history' }), el('p', { class: 'muted', text: 'No domain payments yet. Purchases will be listed here with the date, amount and status.' })]));
+            var hbox = el('div', { class: 'card' }, [el('h2', { text: 'Payment history' }), el('p', { class: 'muted', text: 'Loading\u2026' })]);
+            body.appendChild(hbox);
+            api('/api/domains?orders=1').then(function (r) {
+                clear(hbox); hbox.appendChild(el('h2', { text: 'Payment history' }));
+                var list = (r && r.orders) || [];
+                if (!list.length) { hbox.appendChild(el('p', { class: 'muted', text: 'No domain payments yet. Purchases and renewals will be listed here.' })); return; }
+                list.forEach(function (o) {
+                    hbox.appendChild(el('div', { class: 'row between', style: 'padding:8px 0;border-top:1px solid var(--line, #e5e7eb)' }, [
+                        el('div', {}, [el('strong', { text: o.domain }), el('div', { class: 'muted small', text: (o.kind === 'renewal' ? 'Renewal' : 'Purchase') + ' \u00b7 ' + new Date(o.created_at).toLocaleDateString('en-KE') + (o.receipt ? ' \u00b7 ' + o.receipt : '') })]),
+                        el('div', { style: 'text-align:right' }, [el('div', { text: 'KES ' + moneyText(o.price_kes) }), el('div', { class: 'muted small', text: o.status.replace(/_/g, ' ') })])]));
+                });
+            });
+        }
+
+        if (cur === 'renew') {
+            var rbox = el('div', { class: 'card' }, [el('h2', { text: 'Renew your domain' }), el('p', { class: 'muted', text: 'Loading\u2026' })]);
+            body.appendChild(rbox);
+            api('/api/domains?renewal=1').then(function (r) {
+                clear(rbox); rbox.appendChild(el('h2', { text: 'Renew your domain' }));
+                if (!r || r.error) { rbox.appendChild(el('div', { class: 'notice bad', text: (r && r.error) || 'Could not load the renewal price.' })); return; }
+                var date = new Date(r.expires_at).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' });
+                rbox.appendChild(el('p', {}, [el('strong', { text: r.domain }), r.paused ? ' expired on ' + date + '. Your site is paused until you renew.' : ' expires on ' + date + '.']));
+                if (!r.can_renew) { rbox.appendChild(el('p', { class: 'muted', text: 'You can renew in the last 90 days before it expires. We will remind you here.' })); return; }
+                if (!r.kes_available) { rbox.appendChild(el('div', { class: 'notice bad', text: 'Shilling prices are not available right now, so renewing is paused. Please try again later.' })); return; }
+                var phone = field('phone', 'Your M-Pesa number', 'tel', '', 'The number that will get the payment prompt, for example 0712345678.');
+                var rmsg = el('div', { class: 'notice', style: 'display:none' });
+                var pay = el('button', { class: 'btn primary', type: 'button', text: 'Pay KES ' + moneyText(r.price_kes) + ' with M-Pesa' });
+                function say2(text, kind) { rmsg.style.display = text ? '' : 'none'; rmsg.className = 'notice ' + (kind || ''); rmsg.textContent = text || ''; }
+                pay.addEventListener('click', function () {
+                    phone.setError(''); pay.disabled = true; say2('Sending the payment prompt to your phone\u2026');
+                    api('/api/domains', 'POST', { action: 'renew', phone: phone.input.value }).then(function (x) {
+                        if (!x || !x.order) { pay.disabled = false; if (x && x.fields && x.fields.phone) phone.setError(x.fields.phone); say2((x && x.error) || 'Something went wrong. Please try again.', 'bad'); return; }
+                        say2(x.order.message); watchOrder(x.order.id, 45, say2, pay);
+                    });
+                });
+                rbox.appendChild(el('p', {}, [el('strong', { text: 'KES ' + moneyText(r.price_kes) }), ' for one more year.']));
+                rbox.appendChild(phone.wrap); rbox.appendChild(rmsg); rbox.appendChild(el('div', { class: 'row' }, [pay]));
+                if (r.rate_credit) rbox.appendChild(el('p', { class: 'muted small' }, ['Rates By ', el('a', { href: 'https://www.exchangerate-api.com', target: '_blank', rel: 'noopener noreferrer', text: 'Exchange Rate API' }), '.']));
+            });
         }
         return v;
     }

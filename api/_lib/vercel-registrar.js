@@ -95,4 +95,14 @@ const buyDomain = ({ domain, years, expectedPriceUsd, contact }) =>
 const renewDomain = ({ domain, years, expectedPriceUsd }) =>
     registrarPost(`/v1/registrar/domains/${encodeURIComponent(domain)}/renew`, { years, expectedPrice: expectedPriceUsd });
 
-module.exports = { searchDomains, buyDomain, renewDomain, setTransport, defaultTransport };
+// What Vercel would charge to renew a domain we own, in US cents. { ok:true, renewalCents } or { ok:false }.
+// GET /v1/registrar/domains/{domain}/price?years=1 answers { years, purchasePrice, renewalPrice, transferPrice } (numbers or numeric text).
+async function renewalPrice(domain) {
+    let res;
+    try { res = await transport(`${BASE()}/v1/registrar/domains/${encodeURIComponent(domain)}/price?years=1` + (env('DOMAINS_VERCEL_TEAM') ? `&teamId=${encodeURIComponent(env('DOMAINS_VERCEL_TEAM'))}` : ''), { method: 'GET', headers: env('DOMAINS_VERCEL_TOKEN') ? { Authorization: `Bearer ${env('DOMAINS_VERCEL_TOKEN')}` } : {} }); }
+    catch (err) { return { ok: false }; }
+    const cents = res && res.status === 200 && res.body ? toCents(res.body.renewalPrice) : null;
+    return cents ? { ok: true, renewalCents: cents } : { ok: false };
+}
+
+module.exports = { searchDomains, buyDomain, renewDomain, renewalPrice, setTransport, defaultTransport };

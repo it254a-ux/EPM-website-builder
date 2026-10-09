@@ -8,6 +8,13 @@ const { provisionApp, syncAppToDeriv } = require('./_lib/site-app');
 const send = (res, code, body) => res.status(code).json(body);
 const n = v => (v === undefined ? null : v);
 
+// Only for domains we sold: when it expires and whether the site is paused because of it.
+function renewalState(row) {
+    if (!row.domain_bought_here || !row.domain_expires_at) return null;
+    const days = Math.ceil((new Date(row.domain_expires_at).getTime() - Date.now()) / 86400000);
+    return { expires_at: row.domain_expires_at, days_left: days, state: days < 0 ? 'expired' : days <= 30 ? 'soon' : 'ok', paused: !!row.domain_paused_at };
+}
+
 // What an operator may see about THEIR OWN site (never anyone else's data).
 const view = row => ({
     id: row.id, domain: row.domain, name: row.name, plan: row.plan, status: row.status,
@@ -20,13 +27,14 @@ const view = row => ({
     app_status: row.app_id ? 'assigned' : 'awaiting',
     markup_locked: !!row.app_pooled,              // the pre-made Deriv app fixes the markup
     app_auto: row.app_source === 'api',           // created for this site through Deriv's API: markup changes reach Deriv by themselves
+    renewal: renewalState(row),
 });
 
 const findOwn = async (sql, ownerId) =>
     (await sql`
         SELECT id, domain, name, plan, status, primary_color, font, logo_url, about, vision, mission,
                whatsapp, phone, support_email, telegram, custom_domain_requested, commission_rate_override,
-               markup_percent, app_id, app_source,
+               markup_percent, app_id, app_source, domain_bought_here, domain_expires_at, domain_paused_at,
                EXISTS (SELECT 1 FROM app_pool p WHERE p.site_id = sites.id) AS app_pooled
         FROM sites WHERE owner_id = ${ownerId} LIMIT 1
     `)[0] || null;

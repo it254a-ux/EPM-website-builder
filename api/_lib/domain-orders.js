@@ -157,13 +157,24 @@ async function applyRenewal(sql, o) {
     return [];
 }
 
+// A domain we sold has passed its expiry and nobody renewed it: pause the site. Nothing is charged to you.
+// Pausing uses the normal "suspended" status, which the trading site already treats as "not live". Renewing switches it back on.
+async function pauseExpired(sql) {
+    const paused = await sql`UPDATE sites SET status = 'suspended', domain_paused_at = now(), updated_at = now()
+                             WHERE domain_bought_here = true AND domain_expires_at < now() AND domain_paused_at IS NULL AND status = 'active'
+                             RETURNING id, domain`;
+    for (const p of paused) await logEvent(sql, p.id, 'domain_expired_paused', { domain: p.domain });
+    return paused.length;
+}
+
 // Anything paid but not finished (callback missed, function stopped): called by the daily job and by the operator's polling.
 async function sweep(sql) {
     const stuck = await sql`UPDATE domain_orders SET status = 'check_needed', failure_reason = 'The registration stopped part-way. Check Vercel before doing anything.', updated_at = now()
                             WHERE status = 'buying' AND updated_at < now() - interval '5 minutes' RETURNING id`;
     const paid = await sql`SELECT id FROM domain_orders WHERE status = 'paid' ORDER BY id LIMIT 20`;
     for (const p of paid) await fulfil(sql, p.id);
-    return { stuck: stuck.length, retried: paid.length };
+    const pausedSites = await pauseExpired(sql);
+    return { stuck: stuck.length, retried: paid.length, paused: pausedSites };
 }
 
-module.exports = { PAY_WINDOW_MINUTES, fulfil, sweep, activatePurchase, applyRenewal, MESSAGES, view, get, expireStale, markPaid, confirmWaiting, applyCallback };
+module.exports = { PAY_WINDOW_MINUTES, fulfil, sweep, pauseExpired, activatePurchase, applyRenewal, MESSAGES, view, get, expireStale, markPaid, confirmWaiting, applyCallback };
