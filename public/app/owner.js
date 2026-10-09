@@ -861,21 +861,50 @@
         return v;
     }
 
+    // Each answer: icon, colour class (f1..f6), question, short answer, steps, optional tip. Text only, no HTML.
     var FAQ = [
-        ['How do I create a site?', 'Open Sites, choose Create new site, pick a free address or your own domain, and add your branding. A free address goes live immediately.'],
-        ['How do I connect my own domain?', 'Open Domains, enter your domain and send the request, then add the DNS record shown. We review and activate it, and the Deployments page shows the progress.'],
-        ['How is commission shared?', 'Your share of commission is set out in your agreement with EPM. If you are unsure of it, ask us on WhatsApp.'],
-        ['When do I get paid?', 'Your earnings are updated once a day under Commissions. After Deriv\u2019s monthly partner payment for a month has been received and confirmed, that month\u2019s earnings become available and you can request a withdrawal to M-Pesa or USDT.'],
-        ['Who supports my clients?', 'On a free address, the platform handles client support. On your own domain, you handle it with the contacts you set when editing your site.'],
-        ['Is trading risky?', 'Yes. Trading on Deriv carries a high risk of loss and commission is not guaranteed. Never promise profits to your clients.'],
+        { i: '\u{1F680}', c: 'f1', q: 'How do I create a site?', a: 'Your own branded trading site is ready in about two minutes.',
+          steps: ['Open Sites and choose Create new site.', 'Pick a free address (live at once) or enter your own domain.', 'Add your brand name, logo and colours.', 'Press Save. A free address goes live immediately.'],
+          tip: 'Start on a free address, then connect your own domain whenever you are ready.' },
+        { i: '\u{1F310}', c: 'f2', q: 'How do I connect my own domain?', a: 'Use a domain you already own, such as trade.yourbrand.com.',
+          steps: ['Open Domains, type your domain and send the request.', 'Add the DNS record shown on screen at your domain provider.', 'We review it and switch it on.', 'Follow the progress on the Deployments page.'],
+          tip: 'DNS changes can take a little while to spread. If it is not live after a few hours, message us on WhatsApp.' },
+        { i: '\u{1F4B0}', c: 'f3', q: 'How is commission shared?', a: 'Your share is set out in your agreement with EPM.',
+          steps: ['Open Commissions to see what you have earned, month by month.', 'Your markup and share depend on your Deriv app and your agreement.'],
+          tip: 'Not sure what your share is? Ask us on WhatsApp and we will confirm it.' },
+        { i: '\u{1F4C5}', c: 'f4', q: 'When do I get paid?', a: 'Earnings update once a day and become payable after Deriv pays the month.',
+          steps: ['Your earnings refresh daily under Commissions.', 'After Deriv’s monthly partner payment is received and confirmed, that month becomes available.', 'Request a withdrawal to M-Pesa or USDT.', 'We review and pay it out.'],
+          tip: 'A month is only paid once Deriv has paid it, so payment follows Deriv’s own monthly schedule.' },
+        { i: '\u{1F91D}', c: 'f5', q: 'Who supports my clients?', a: 'It depends on whether you use a free address or your own domain.',
+          steps: ['Free address: the platform handles your client support.', 'Your own domain: you handle it, using the contacts you set when editing your site (WhatsApp, phone, email, Telegram).'],
+          tip: 'Add your support contacts when editing your site so clients can reach you.' },
+        { i: '⚠️', c: 'f6', q: 'Is trading risky?', a: 'Yes. Trading on Deriv carries a high risk of loss.',
+          steps: ['Commission is not guaranteed and depends on your clients trading.', 'Never promise profits or guaranteed returns to your clients.', 'Encourage clients to trade only with money they can afford to lose.'],
+          tip: 'Being honest about risk protects you and your clients.' },
+        { i: '\u{1F916}', c: 'f2', q: 'Can I add my own bots and strategies?', a: 'Yes. Your site can have its own trading bots and strategy documents.',
+          steps: ['Open Trading bots to upload a bot (XML file). It goes live on your site at once.', 'Open Strategies to upload documents (PDF, Word, Excel, PowerPoint, images or text).', 'Want a bot we have not built yet? Send a request from the Requests page.'],
+          tip: 'You can remove or replace your bots and documents at any time.' },
+        { i: '\u{1F3A8}', c: 'f1', q: 'Can you design a website for me?', a: 'Yes. We can design a fully custom website for you, from logo and colours to layout and content.',
+          steps: ['Message us on WhatsApp and tell us about your business.', 'Share your brand name, colours, logo and any sites you like.', 'We reply with a plan and a quote, then design it with you.'],
+          tip: 'Premium, professional design built around your brand.', cta: true },
     ];
     function supportView() {
         var v = el('div');
         v.appendChild(head('Help', 'Support', 'Chat with us on WhatsApp, or browse answers to common questions.'));
         v.appendChild(el('div', { class: 'card row between' }, [el('div', {}, [el('h2', { text: 'WhatsApp support' }), el('span', { class: 'muted', text: 'Chat with us at ' + WA_SHOW + ' for setup help, billing questions and technical support.' })]),
             el('a', { class: 'btn green', href: waLink('Hello EPM, I need help with my site.'), target: '_blank', rel: 'noopener', text: 'Chat on WhatsApp' })]));
-        var faq = el('div', { class: 'card' }, [el('h2', { text: 'Frequently asked questions' })]);
-        FAQ.forEach(function (q) { faq.appendChild(el('details', {}, [el('summary', { text: q[0] }), el('p', { text: q[1] })])); });
+        v.appendChild(el('div', { class: 'design-cta' }, [
+            el('div', { class: 'dc-text' }, [el('span', { class: 'dc-kicker', text: 'Custom design' }), el('h2', { text: 'Want a premium website designed for you?' }),
+                el('p', { text: 'Tell us about your brand and we will design a professional, one-of-a-kind website for you.' })]),
+            el('a', { class: 'btn dc-btn', href: waLink('Hello EPM, I would like you to design a website for me.'), target: '_blank', rel: 'noopener', text: 'Request a design' })]));
+        var faq = el('div', { class: 'faq' }, [el('h2', { class: 'faq-title', text: 'Frequently asked questions' }), el('p', { class: 'muted', text: 'Tap a question to see the full answer.' })]);
+        FAQ.forEach(function (q) {
+            var body = el('div', { class: 'faq-body' }, [el('p', { class: 'faq-lead', text: q.a })]);
+            body.appendChild(el('ol', { class: 'faq-steps' }, q.steps.map(function (t) { return el('li', { text: t }); })));
+            if (q.tip) body.appendChild(el('div', { class: 'faq-tip' }, [el('strong', { text: 'Good to know  ' }), el('span', { text: q.tip })]));
+            if (q.cta) body.appendChild(el('a', { class: 'btn dc-btn', href: waLink('Hello EPM, I would like you to design a website for me.'), target: '_blank', rel: 'noopener', text: 'Request a design on WhatsApp' }));
+            faq.appendChild(el('details', { class: 'faq-item ' + q.c }, [el('summary', {}, [el('span', { class: 'faq-ico', text: q.i }), el('span', { class: 'faq-q', text: q.q }), el('span', { class: 'faq-chev', text: '▾' })]), body]));
+        });
         v.appendChild(faq);
         return v;
     }
