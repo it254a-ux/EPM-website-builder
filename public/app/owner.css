@@ -118,3 +118,8 @@ details{border-bottom:1px solid var(--line);padding:12px 0}details:last-child{bo
 @media (max-width:600px){.faq-modal{align-items:end;padding:0}.fm-card{border-radius:22px 22px 0 0;max-height:88vh}}
 @media (prefers-reduced-motion:reduce){.faq-modal,.fm-card,.faq-modal.closing,.faq-modal.closing .fm-card{animation-duration:.01s}.faq-item,.fm-x{transition:none}}
 .fm-card.f4 .fm-head h3{color:#3b2500}.fm-card.f4 .fm-x{color:#3b2500;background:rgba(255,255,255,.55)}
+/* FAQ cards in two columns (one column on phones) */
+.faq{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.faq>.faq-title,.faq>.muted{grid-column:1/-1;margin-bottom:0}.faq>.muted{margin:0 0 4px}
+.faq-item{margin:0;height:100%}.faq-q{font-size:.98rem}
+@media (max-width:700px){.faq{grid-template-columns:1fr}}
