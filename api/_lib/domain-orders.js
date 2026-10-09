@@ -3,6 +3,11 @@
 // Every status change is one SQL statement that names the status it expects, so repeated or racing messages cannot do it twice.
 
 const M = require('./mpesa');
+const R = require('./vercel-registrar');
+const VD = require('./vercel-domains');
+const { logEvent } = require('./events');
+const { syncAppToDeriv, reasonOf } = require('./site-app');
+const S = require('./site-settings');
 
 const PAY_WINDOW_MINUTES = 10;
 
@@ -78,7 +83,7 @@ async function applyCallback(sql, cb) {
     if (!found) return { handled: false };
     if (cb.resultCode !== 0) {
         await sql`UPDATE domain_orders SET status = 'cancelled', failure_reason = ${cb.desc || 'Payment not completed'}, updated_at = now() WHERE id = ${found.id} AND status = 'awaiting_payment'`;
-        return { handled: true, status: 'cancelled' };
+        return { handled: true, id: found.id, status: 'cancelled' };
     }
     // Remember what they say they paid (and the receipt), but do not mark it paid until Safaricom confirms.
     try {
@@ -86,18 +91,79 @@ async function applyCallback(sql, cb) {
     } catch (err) {
         if (!(err && err.code === '23505')) throw err;
         await sql`UPDATE domain_orders SET status = 'refund_due', failure_reason = 'That M-Pesa receipt was already used on another order.', updated_at = now() WHERE id = ${found.id} AND status = 'awaiting_payment'`;
-        return { handled: true, status: 'refund_due' };
+        return { handled: true, id: found.id, status: 'refund_due' };
     }
     const q = await M.stkQuery(cb.checkoutId);
     if (q.paid === true) {
         const o = await markPaid(sql, found.id, { receipt: cb.receipt, paidKes: cb.amount === null ? null : Math.round(cb.amount) });
-        return { handled: true, status: o ? o.status : found.status };
+        return { handled: true, id: found.id, status: o ? o.status : found.status };
     }
     if (q.paid === false) {
         await sql`UPDATE domain_orders SET status = 'cancelled', failure_reason = ${q.desc || 'Payment not completed'}, updated_at = now() WHERE id = ${found.id} AND status = 'awaiting_payment'`;
-        return { handled: true, status: 'cancelled' };
+        return { handled: true, id: found.id, status: 'cancelled' };
     }
-    return { handled: true, status: 'awaiting_payment' };      // Safaricom could not say yet: the next check will settle it
+    return { handled: true, id: found.id, status: 'awaiting_payment' };      // Safaricom could not say yet: the next check will settle it
 }
 
-module.exports = { PAY_WINDOW_MINUTES, MESSAGES, view, get, expireStale, markPaid, confirmWaiting, applyCallback };
+// ---------- after payment: buy (or renew) the domain, then connect the site ----------
+const note = (sql, id, text) => sql`UPDATE domain_orders SET failure_reason = ${String(text).slice(0, 300)}, updated_at = now() WHERE id = ${id}`;
+
+// The domain is ours now. Point the site at it. Every step after the purchase is best-effort: money and domain are already real,
+// so a failure here is written on the order for the admin instead of undoing anything.
+async function activatePurchase(sql, o) {
+    const notes = [];
+    const site = (await sql`SELECT * FROM sites WHERE id = ${o.site_id}`)[0];
+    if (!site) return ['The site no longer exists.'];
+    try {
+        await sql`UPDATE sites SET domain = ${o.domain}, plan = 'custom', status = 'active', custom_domain_requested = NULL, domain_bought_here = true,
+                                   domain_expires_at = now() + interval '1 year', domain_paused_at = NULL, updated_at = now() WHERE id = ${o.site_id}`;
+    } catch (err) { return ['Registered, but the site could not be switched: ' + reasonOf(err)]; }
+    const share = site.commission_rate_override !== null ? Number(site.commission_rate_override) : S.PLAN_SHARE.custom;
+    try { await sql`INSERT INTO site_rate_history (site_id, plan, platform_share) VALUES (${o.site_id}, 'custom', ${share})`; } catch (err) { notes.push('Rate history not written.'); }
+    await logEvent(sql, o.site_id, 'domain_bought', { domain: o.domain });
+    if (site.app_id && site.app_source === 'api') {
+        try { await syncAppToDeriv(sql, site, { plan: 'custom', domain: o.domain }); await logEvent(sql, o.site_id, 'app_redirect_updated', { domain: o.domain }); }
+        catch (err) { notes.push(`The Deriv app redirect was not updated (${reasonOf(err)}).`); }
+    }
+    const v = await VD.addDomain(o.domain);
+    if (v.status !== 'off') await logEvent(sql, o.site_id, 'domain_vercel_' + v.status, { domain: o.domain });
+    if (!['added', 'already_added'].includes(v.status)) notes.push(`Not yet on the Vercel project: ${v.message}`);
+    return notes;
+}
+
+// Claims a paid order and does the registrar call. Safe to call from anywhere, any number of times: only one caller wins the claim.
+async function fulfil(sql, id) {
+    const o = (await sql`UPDATE domain_orders SET status = 'buying', attempts = attempts + 1, updated_at = now() WHERE id = ${id} AND status = 'paid' RETURNING *`)[0];
+    if (!o) return null;
+    const args = { domain: o.domain, years: o.years, expectedPriceUsd: o.cost_usd_cents / 100 };
+    const r = o.kind === 'renewal' ? await R.renewDomain(args) : await R.buyDomain({ ...args, contact: o.contact });
+    if (!r.ok) {
+        if (r.kind === 'definite') await sql`UPDATE domain_orders SET status = 'refund_due', failure_reason = ${r.message}, updated_at = now() WHERE id = ${id}`;
+        else if (r.kind === 'retry' && o.attempts < 5) await sql`UPDATE domain_orders SET status = 'paid', failure_reason = ${r.message}, updated_at = now() WHERE id = ${id}`;
+        else await sql`UPDATE domain_orders SET status = 'check_needed', failure_reason = ${r.message}, updated_at = now() WHERE id = ${id}`;
+        return get(sql, id);
+    }
+    await sql`UPDATE domain_orders SET status = 'completed', vercel_order_id = ${r.orderId}, completed_at = now(), failure_reason = NULL, updated_at = now() WHERE id = ${id}`;
+    const notes = o.kind === 'renewal' ? await applyRenewal(sql, o) : await activatePurchase(sql, o);
+    if (notes.length) await note(sql, id, notes.join(' '));
+    return get(sql, id);
+}
+
+// A renewal went through: push the expiry out a year, and switch the site back on if we paused it.
+async function applyRenewal(sql, o) {
+    await sql`UPDATE sites SET domain_expires_at = COALESCE(domain_expires_at, now()) + interval '1 year', updated_at = now() WHERE id = ${o.site_id}`;
+    const back = await sql`UPDATE sites SET status = 'active', domain_paused_at = NULL, updated_at = now() WHERE id = ${o.site_id} AND domain_paused_at IS NOT NULL RETURNING id`;
+    await logEvent(sql, o.site_id, back.length ? 'domain_renewed_resumed' : 'domain_renewed', { domain: o.domain });
+    return [];
+}
+
+// Anything paid but not finished (callback missed, function stopped): called by the daily job and by the operator's polling.
+async function sweep(sql) {
+    const stuck = await sql`UPDATE domain_orders SET status = 'check_needed', failure_reason = 'The registration stopped part-way. Check Vercel before doing anything.', updated_at = now()
+                            WHERE status = 'buying' AND updated_at < now() - interval '5 minutes' RETURNING id`;
+    const paid = await sql`SELECT id FROM domain_orders WHERE status = 'paid' ORDER BY id LIMIT 20`;
+    for (const p of paid) await fulfil(sql, p.id);
+    return { stuck: stuck.length, retried: paid.length };
+}
+
+module.exports = { PAY_WINDOW_MINUTES, fulfil, sweep, activatePurchase, applyRenewal, MESSAGES, view, get, expireStale, markPaid, confirmWaiting, applyCallback };

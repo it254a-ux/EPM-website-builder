@@ -137,6 +137,7 @@ module.exports = async function handler(req, res) {
                 let o = Number.isInteger(id) ? await DO.get(sql, id) : null;
                 if (!o || o.owner_id !== me.id) return send(res, 404, { error: 'Order not found.' });
                 if (o.status === 'awaiting_payment') { await DO.confirmWaiting(sql, o.id); o = await DO.get(sql, o.id); }
+                if (o.status === 'paid') { await DO.fulfil(sql, o.id); o = await DO.get(sql, o.id); }
                 return send(res, 200, { order: DO.view(o) });
             }
             if (q.orders !== undefined) {

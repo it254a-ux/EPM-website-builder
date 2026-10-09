@@ -145,6 +145,32 @@
                 reqRows.length ? table(['Requested', 'Operator', 'Site', 'Amount', 'Pay to', 'Status', ''], reqRows) : el('p', { class: 'muted', text: 'No withdrawal requests yet.' })]));
         })();
 
+        // ----- Domain orders -----
+        (function () {
+            var holder = el('div', { class: 'card' }, [el('h2', { text: 'Domain orders' }), el('p', { class: 'muted', text: 'Loading\u2026' })]);
+            app.appendChild(holder);
+            api('/api/admin?resource=domain_orders').then(function (r) {
+                while (holder.firstChild) holder.removeChild(holder.firstChild); holder.appendChild(el('h2', { text: 'Domain orders' }));
+                if (!r || r.error) { holder.appendChild(el('p', { class: 'muted', text: 'Could not load domain orders.' })); return; }
+                var rows = (r.orders || []).map(function (o) {
+                    var btns = el('div', { class: 'row' });
+                    if (o.status === 'refund_due' || o.status === 'check_needed') btns.appendChild(el('button', { text: 'Mark refunded', onclick: function () {
+                        var ref = prompt('Refund KES ' + o.paid_kes + ' to ' + o.phone + ' by M-Pesa, then enter the M-Pesa code:'); if (ref === null) return;
+                        act({ action: 'order_refunded', id: o.id, reference: ref.trim() }); } }));
+                    if (o.status === 'check_needed') btns.appendChild(el('button', { text: 'It is registered', onclick: function () {
+                        if (confirm('Only press this after you saw ' + o.domain + ' in your Vercel domains. The site will be switched to it. Continue?')) act({ action: 'order_complete', id: o.id }); } }));
+                    if (o.status === 'check_needed' || o.status === 'paid') btns.appendChild(el('button', { text: 'Try again', onclick: function () {
+                        if (confirm('Try to register ' + o.domain + ' again? If it is already registered, Vercel will refuse and nothing is charged twice.')) act({ action: 'order_retry', id: o.id }); } }));
+                    var needs = ['refund_due', 'check_needed', 'paid', 'buying'].indexOf(o.status) >= 0;
+                    return [new Date(o.created_at).toLocaleString(), (o.owner_name || '') + ' ' + (o.owner_email || ''), o.domain + (o.kind === 'renewal' ? ' (renewal)' : ''),
+                        'KES ' + (o.paid_kes || o.price_kes) + (o.mpesa_receipt ? ' · ' + o.mpesa_receipt : ''), 'Vercel cost $' + Number(o.cost_usd).toFixed(2),
+                        el('span', { class: needs ? 'pill bad' : 'pill', text: o.status }), (o.failure_reason || '') + (o.refund_reference ? ' Refund ' + o.refund_reference : ''), btns];
+                });
+                holder.appendChild(el('p', { class: 'muted', text: 'Orders that need you come first. Money is only taken after Safaricom confirms it.' }));
+                holder.appendChild(rows.length ? table(['Created', 'Operator', 'Domain', 'Paid', 'Your cost', 'Status', 'Note', ''], rows) : el('p', { class: 'muted', text: 'No domain orders yet.' }));
+            });
+        })();
+
         // ----- Bots, documents and requests operators added -----
         (function () {
             var when = function (v) { return new Date(v).toLocaleString(); };

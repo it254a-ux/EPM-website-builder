@@ -4,6 +4,7 @@ const S = require('./_lib/site-settings');
 const { logEvent } = require('./_lib/events');
 const { assignFromPool, assignWaiting } = require('./_lib/app-pool');
 const deriv = require('./_lib/deriv-apps');
+const DO = require('./_lib/domain-orders');
 const { provisionApp, syncAppToDeriv, reasonOf } = require('./_lib/site-app');
 const C = require('./_lib/commissions');
 const L = require('./_lib/library');
@@ -27,7 +28,7 @@ const audit = (sql, adminId, action, target, detail) =>
 //   3. state-changing calls must come from the same site (no cross-site posts)
 //
 //   GET  /api/admin?resource=all | sites | owners | audit | pool | deriv | commissions | library
-//   POST /api/admin  { action: set_status | update_site | approve_custom | connect_domain | create_app | deriv_test | commission_sync | confirm_month | payout_paid | payout_reject | library_remove | library_restore | request_answer | set_app_id | set_markup | pool_add | pool_remove | assign_from_pool | set_rate | disable_owner | delete_site | delete_owner, ... }
+//   POST /api/admin  { action: set_status | update_site | approve_custom | connect_domain | order_refunded | order_retry | order_complete | create_app | deriv_test | commission_sync | confirm_month | payout_paid | payout_reject | library_remove | library_restore | request_answer | set_app_id | set_markup | pool_add | pool_remove | assign_from_pool | set_rate | disable_owner | delete_site | delete_owner, ... }
 module.exports = async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store');
     if (!A.onPlatformHost(req, 'strict')) return send(res, 404, { error: 'Not found' });
@@ -66,6 +67,12 @@ module.exports = async function handler(req, res) {
             deriv: async () => ({ enabled: deriv.isEnabled(), configured: deriv.isConfigured(), missing: deriv.missingSettings() }),
             commissions: () => C.adminView(sql),
             library: () => L.adminView(sql),
+            domain_orders: async () => ({ orders: (await sql`
+                SELECT d.id, d.kind, d.domain, d.status, d.price_kes, d.price_usd_cents, d.cost_usd_cents, d.mpesa_receipt, d.paid_kes, d.phone, d.failure_reason, d.refund_reference,
+                       d.vercel_order_id, d.attempts, d.created_at, d.paid_at, d.completed_at, o.email AS owner_email, o.name AS owner_name
+                FROM domain_orders d JOIN owners o ON o.id = d.owner_id
+                ORDER BY (d.status IN ('refund_due', 'check_needed', 'paid', 'buying')) DESC, d.id DESC LIMIT 60`).map(r => ({
+                    ...r, price_usd: r.price_usd_cents / 100, cost_usd: r.cost_usd_cents / 100, price_usd_cents: undefined, cost_usd_cents: undefined })) }),
             owners: async () => ({ owners: await sql`SELECT id, email, name, role, disabled, created_at FROM owners ORDER BY created_at DESC LIMIT 500` }),
             audit: async () => ({ audit: await sql`SELECT id, owner_id, action, target, detail, created_at FROM audit_log ORDER BY id DESC LIMIT 200` }),
         };
@@ -90,6 +97,34 @@ module.exports = async function handler(req, res) {
             (await sql`SELECT id, name, domain, plan, status, custom_domain_requested, commission_rate_override, markup_percent, app_id, app_source FROM sites WHERE id = ${siteId} LIMIT 1`)[0];
 
         switch (body.action) {
+            // ---- domain orders that need a person ----
+            case 'order_refunded': {
+                const reference = String(body.reference || '').trim().slice(0, 100);
+                if (reference.length < 3) return send(res, 400, { error: 'Enter the M-Pesa code you refunded with.' });
+                const r = await sql`UPDATE domain_orders SET status = 'refunded', refund_reference = ${reference}, updated_at = now()
+                                    WHERE id = ${Number(body.id) || 0} AND status IN ('refund_due', 'check_needed') RETURNING id, owner_id, domain`;
+                if (!r.length) return send(res, 409, { error: 'That order is not waiting for a refund.' });
+                await audit(sql, me.id, 'order_refunded', r[0].id, { domain: r[0].domain, reference });
+                return send(res, 200, { ok: true });
+            }
+            case 'order_retry': {
+                const r = await sql`UPDATE domain_orders SET status = 'paid', attempts = 0, failure_reason = NULL, updated_at = now()
+                                    WHERE id = ${Number(body.id) || 0} AND status IN ('check_needed', 'paid') RETURNING id, domain`;
+                if (!r.length) return send(res, 409, { error: 'That order cannot be retried.' });
+                const done = await DO.fulfil(sql, r[0].id);
+                await audit(sql, me.id, 'order_retry', r[0].id, { domain: r[0].domain, result: done && done.status });
+                return send(res, 200, done && done.status === 'completed' ? { ok: true, notice: `${r[0].domain} is registered.` } : { ok: true, warning: `Not done yet: ${(done && done.failure_reason) || 'see the order'}` });
+            }
+            case 'order_complete': {
+                const r = await sql`UPDATE domain_orders SET status = 'completed', completed_at = now(), failure_reason = NULL, updated_at = now()
+                                    WHERE id = ${Number(body.id) || 0} AND status = 'check_needed' RETURNING *`;
+                if (!r.length) return send(res, 409, { error: 'That order is not waiting for a check.' });
+                const notes = r[0].kind === 'renewal' ? await DO.applyRenewal(sql, r[0]) : await DO.activatePurchase(sql, r[0]);
+                if (notes.length) await sql`UPDATE domain_orders SET failure_reason = ${notes.join(' ').slice(0, 300)} WHERE id = ${r[0].id}`;
+                await audit(sql, me.id, 'order_complete', r[0].id, { domain: r[0].domain });
+                return send(res, 200, notes.length ? { ok: true, warning: notes.join(' ') } : { ok: true });
+            }
+
             case 'set_status': {
                 if (!STATUSES.includes(body.status)) return send(res, 400, { error: 'Invalid status.' });
                 const r = await sql`UPDATE sites SET status = ${body.status}, updated_at = now() WHERE id = ${siteId} RETURNING id`;

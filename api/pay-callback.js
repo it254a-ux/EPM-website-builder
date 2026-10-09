@@ -24,7 +24,9 @@ module.exports = async function handler(req, res) {
     const ok = () => res.status(200).json({ ResultCode: 0, ResultDesc: 'Accepted' });
     if (!cb) return ok();
     try {
-        await DO.applyCallback(getDb(), cb);
+        const sql = getDb();
+        const r = await DO.applyCallback(sql, cb);
+        if (r && r.status === 'paid' && r.id) await DO.fulfil(sql, r.id);
     } catch (err) {
         console.error('pay-callback error:', err && err.message);
     }
