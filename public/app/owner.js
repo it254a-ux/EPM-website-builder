@@ -191,7 +191,7 @@
         sideEl = el('aside', { class: 'side' }, [el('div', { class: 'brandmark' }, [el('i', { text: 'E' }), el('span', { text: 'EPM' })]), nav, user]);
         scrimEl = el('div', { class: 'scrim hidden', onclick: closeMenu });
         var menu = el('button', { class: 'menu', 'aria-label': 'Menu', onclick: function () { sideEl.classList.add('open'); scrimEl.classList.remove('hidden'); } }, [svg(ICON.menu)]);
-        whoEl = el('div', { class: 'who' }, ['Signed in ', el('b', { text: S.owner.name })]);
+        whoEl = el('div', { class: 'who' }, [el('span', { class: 'lbl', text: 'Signed in ' }), el('b', { text: S.owner.name })]);
         var logout = el('button', { class: 'btn', text: 'Log out', onclick: function () { api('/api/auth?action=logout', 'POST').then(function () { S.owner = null; S.site = null; S.comm = null; S.lib = null; authView(false); }); } });
         viewEl = el('main', { id: 'view' });
         ['input', 'change'].forEach(function (t) { viewEl.addEventListener(t, function () { touched = true; }); });
@@ -954,7 +954,7 @@
         var v = el('div'), o = S.owner;
         v.appendChild(head('Account', 'Settings'));
         v.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Profile' }),
-            el('table', {}, [el('tr', {}, [el('th', { text: 'Full name' }), el('td', { text: o.name })]), el('tr', {}, [el('th', { text: 'Email address' }), el('td', { text: o.email })])])]));
+            el('table', { class: 'kv' }, [el('tr', {}, [el('th', { text: 'Full name' }), el('td', { text: o.name })]), el('tr', {}, [el('th', { text: 'Email address' }), el('td', { text: o.email })])])]));
         var installBtn = el('button', { class: 'btn primary', text: 'Install app', onclick: installNow });
         installBtn.disabled = !installEvent;
         v.appendChild(el('div', { class: 'card row between' }, [el('div', {}, [el('h2', { text: 'Install the EPM app' }),
