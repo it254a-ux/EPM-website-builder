@@ -488,7 +488,6 @@
                         out.appendChild(el('div', { class: 'card', style: 'margin-top:8px' }, [el('div', { class: 'row', style: 'justify-content:space-between;align-items:center' }, [el('strong', { text: d.domain }), right])]));
                     });
                     if (!r.kes_available) out.appendChild(el('p', { class: 'muted small', text: 'Prices are shown in US dollars for now. Payment is by M-Pesa in shillings.' }));
-                    if (r.rate_credit) out.appendChild(el('p', { class: 'muted small' }, ['Rates By ', el('a', { href: 'https://www.exchangerate-api.com', target: '_blank', rel: 'noopener noreferrer', text: 'Exchange Rate API' }), '.']));
                     out.appendChild(el('p', { class: 'muted small', text: 'Nothing is charged by searching. You pay by M-Pesa only after you confirm.' }));
                 });
             }
