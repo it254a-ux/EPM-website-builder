@@ -888,6 +888,33 @@
           steps: ['Message us on WhatsApp and tell us about your business.', 'Share your brand name, colours, logo and any sites you like.', 'We reply with a plan and a quote, then design it with you.'],
           tip: 'Premium, professional design built around your brand.', cta: true },
     ];
+    // One answer at a time, in a popup. Closes with the X button, a click outside, or the Escape key.
+    function openFaq(q, opener) {
+        var old = document.getElementById('faq-modal'); if (old) old.remove();
+        var prevOverflow = document.body.style.overflow;
+        var done = false, onKey;
+        function close() {
+            if (done) return; done = true;
+            document.removeEventListener('keydown', onKey);
+            document.body.style.overflow = prevOverflow;
+            overlay.classList.add('closing');
+            setTimeout(function () { overlay.remove(); if (opener && opener.focus) opener.focus(); }, 200);
+        }
+        var closeBtn = el('button', { class: 'fm-x', type: 'button', 'aria-label': 'Close', text: '\u2715', onclick: close });
+        var body = el('div', { class: 'fm-body' }, [el('p', { class: 'faq-lead', text: q.a })]);
+        body.appendChild(el('ol', { class: 'faq-steps' }, q.steps.map(function (t) { return el('li', { text: t }); })));
+        if (q.tip) body.appendChild(el('div', { class: 'faq-tip' }, [el('strong', { text: 'Good to know  ' }), el('span', { text: q.tip })]));
+        if (q.cta) body.appendChild(el('a', { class: 'btn dc-btn', href: waLink('Hello EPM, I would like you to design a website for me.'), target: '_blank', rel: 'noopener', text: 'Request a design on WhatsApp' }));
+        var dialog = el('div', { class: 'fm-card ' + q.c, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'fm-title' }, [
+            el('div', { class: 'fm-head' }, [el('span', { class: 'fm-ico', text: q.i }), el('h3', { id: 'fm-title', text: q.q }), closeBtn]), body]);
+        var overlay = el('div', { class: 'faq-modal', id: 'faq-modal' }, [dialog]);
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
+        onKey = function (e) { if (e.key === 'Escape') close(); };
+        document.addEventListener('keydown', onKey);
+        document.body.style.overflow = 'hidden';
+        document.body.appendChild(overlay);
+        closeBtn.focus();
+    }
     function supportView() {
         var v = el('div');
         v.appendChild(head('Help', 'Support', 'Chat with us on WhatsApp, or browse answers to common questions.'));
@@ -899,11 +926,9 @@
             el('a', { class: 'btn dc-btn', href: waLink('Hello EPM, I would like you to design a website for me.'), target: '_blank', rel: 'noopener', text: 'Request a design' })]));
         var faq = el('div', { class: 'faq' }, [el('h2', { class: 'faq-title', text: 'Frequently asked questions' }), el('p', { class: 'muted', text: 'Tap a question to see the full answer.' })]);
         FAQ.forEach(function (q) {
-            var body = el('div', { class: 'faq-body' }, [el('p', { class: 'faq-lead', text: q.a })]);
-            body.appendChild(el('ol', { class: 'faq-steps' }, q.steps.map(function (t) { return el('li', { text: t }); })));
-            if (q.tip) body.appendChild(el('div', { class: 'faq-tip' }, [el('strong', { text: 'Good to know  ' }), el('span', { text: q.tip })]));
-            if (q.cta) body.appendChild(el('a', { class: 'btn dc-btn', href: waLink('Hello EPM, I would like you to design a website for me.'), target: '_blank', rel: 'noopener', text: 'Request a design on WhatsApp' }));
-            faq.appendChild(el('details', { class: 'faq-item ' + q.c }, [el('summary', {}, [el('span', { class: 'faq-ico', text: q.i }), el('span', { class: 'faq-q', text: q.q }), el('span', { class: 'faq-chev', text: '▾' })]), body]));
+            var card = el('button', { class: 'faq-item ' + q.c, type: 'button', 'aria-haspopup': 'dialog' }, [el('span', { class: 'faq-ico', text: q.i }), el('span', { class: 'faq-q', text: q.q }), el('span', { class: 'faq-chev', text: '\u203A' })]);
+            card.addEventListener('click', function () { openFaq(q, card); });
+            faq.appendChild(card);
         });
         v.appendChild(faq);
         return v;

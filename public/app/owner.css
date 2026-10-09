@@ -91,23 +91,30 @@ details{border-bottom:1px solid var(--line);padding:12px 0}details:last-child{bo
 .dc-kicker{display:inline-block;font-size:.72rem;font-weight:700;letter-spacing:.12em;text-transform:uppercase;padding:4px 10px;border-radius:999px;background:rgba(255,255,255,.18)}
 .btn.dc-btn{background:#fff;color:#0b1f3a;border-color:#fff;padding:11px 20px;box-shadow:0 6px 16px rgba(0,0,0,.18)}.btn.dc-btn:hover{transform:translateY(-1px)}
 .faq{margin-top:8px}.faq-title{font-size:1.4rem}.faq>.muted{margin:4px 0 14px}
-.faq-item{--a:#7c3aed;--b:#a78bfa;--soft:#f3edff;position:relative;margin:0 0 12px;padding:0;border:1px solid var(--line);border-left:5px solid var(--a);border-radius:16px;background:#fff;overflow:hidden;box-shadow:0 2px 8px rgba(15,28,46,.05);transition:box-shadow .2s,transform .2s}
-.faq-item:last-child{border:1px solid var(--line);border-left:5px solid var(--a)}
-.faq-item:hover{box-shadow:0 8px 22px rgba(15,28,46,.12);transform:translateY(-1px)}
-.faq-item[open]{background:linear-gradient(180deg,var(--soft),#fff 120px);box-shadow:0 10px 26px rgba(15,28,46,.12)}
-.faq-item.f1{--a:#7c3aed;--b:#a78bfa;--soft:#f3edff}.faq-item.f2{--a:#0ea5e9;--b:#67e8f9;--soft:#e8f7fe}.faq-item.f3{--a:#10b981;--b:#6ee7b7;--soft:#e7faf2}
-.faq-item.f4{--a:#f59e0b;--b:#fcd34d;--soft:#fff6e0}.faq-item.f5{--a:#ec4899;--b:#f9a8d4;--soft:#ffe9f3}.faq-item.f6{--a:#ef4444;--b:#fca5a5;--soft:#ffeceb}
-.faq-item summary{list-style:none;display:flex;align-items:center;gap:14px;padding:16px 18px;font-weight:600}
-.faq-item summary::-webkit-details-marker{display:none}
-.faq-ico{flex:none;width:42px;height:42px;display:grid;place-items:center;font-size:1.25rem;border-radius:13px;background:linear-gradient(135deg,var(--a),var(--b));box-shadow:0 6px 14px rgba(15,28,46,.18)}
-.faq-q{flex:1;font-size:1.02rem}.faq-chev{flex:none;font-size:1.2rem;color:var(--a);transition:transform .25s}.faq-item[open] .faq-chev{transform:rotate(180deg)}
-.faq-body{padding:0 20px 20px 74px;animation:faqin .25s ease}
+.faq-item{--a:#7c3aed;--b:#a78bfa;--soft:#f3edff;display:flex;align-items:center;gap:14px;width:100%;text-align:left;margin:0 0 12px;padding:16px 18px;border:1px solid var(--line);border-left:5px solid var(--a);border-radius:16px;background:#fff;cursor:pointer;font-weight:600;box-shadow:0 2px 8px rgba(15,28,46,.05);transition:box-shadow .2s,transform .2s,background .2s}
+.faq-item:hover,.faq-item:focus-visible{background:linear-gradient(90deg,var(--soft),#fff 70%);box-shadow:0 8px 22px rgba(15,28,46,.12);transform:translateY(-1px);outline:none}
+.faq-item:focus-visible{outline:2px solid var(--a)}
+.faq-item.f1,.fm-card.f1{--a:#7c3aed;--b:#a78bfa;--soft:#f3edff}.faq-item.f2,.fm-card.f2{--a:#0ea5e9;--b:#67e8f9;--soft:#e8f7fe}.faq-item.f3,.fm-card.f3{--a:#10b981;--b:#6ee7b7;--soft:#e7faf2}
+.faq-item.f4,.fm-card.f4{--a:#f59e0b;--b:#fcd34d;--soft:#fff6e0}.faq-item.f5,.fm-card.f5{--a:#ec4899;--b:#f9a8d4;--soft:#ffe9f3}.faq-item.f6,.fm-card.f6{--a:#ef4444;--b:#fca5a5;--soft:#ffeceb}
+.faq-ico,.fm-ico{flex:none;width:42px;height:42px;display:grid;place-items:center;font-size:1.25rem;border-radius:13px;background:linear-gradient(135deg,var(--a),var(--b));box-shadow:0 6px 14px rgba(15,28,46,.18)}
+.faq-q{flex:1;font-size:1.02rem}.faq-chev{flex:none;font-size:1.6rem;line-height:1;color:var(--a);transition:transform .2s}.faq-item:hover .faq-chev{transform:translateX(4px)}
 .faq-lead{margin:0 0 10px!important;color:var(--text)!important;font-weight:600}
 .faq-steps{margin:0 0 14px;padding:0;list-style:none;counter-reset:s;color:var(--muted)}
 .faq-steps li{counter-increment:s;position:relative;padding:6px 0 6px 36px}
 .faq-steps li::before{content:counter(s);position:absolute;left:0;top:5px;width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:.78rem;font-weight:700;color:#fff;background:var(--a)}
 .faq-tip{padding:11px 14px;border-radius:12px;background:var(--soft);border:1px dashed var(--a);font-size:.9rem;color:var(--text)}.faq-tip strong{color:var(--a)}
-.faq-body .btn.dc-btn{margin-top:14px;background:linear-gradient(120deg,#7c3aed,#ec4899);color:#fff;border-color:transparent}
-@keyframes faqin{from{opacity:0;transform:translateY(-6px)}to{opacity:1;transform:none}}
-@media (max-width:600px){.faq-body{padding:0 16px 18px 16px}.design-cta{padding:20px}}
-@media (prefers-reduced-motion:reduce){.faq-body{animation:none}.faq-item,.faq-chev{transition:none}}
+/* popup */
+.faq-modal{position:fixed;inset:0;z-index:60;display:grid;place-items:center;padding:20px;background:rgba(8,16,32,.55);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);animation:fmfade .25s ease both}
+.fm-card{--a:#7c3aed;--b:#a78bfa;--soft:#f3edff;width:min(560px,100%);max-height:calc(100vh - 40px);overflow:auto;border-radius:22px;background:#fff;box-shadow:0 30px 70px rgba(0,0,0,.35);animation:fmpop .38s cubic-bezier(.2,1.2,.3,1) both}
+.fm-head{position:sticky;top:0;display:flex;align-items:center;gap:14px;padding:20px 60px 18px 22px;color:#fff;background:linear-gradient(135deg,var(--a),var(--b))}
+.fm-head h3{color:#fff;font-size:1.2rem;line-height:1.25}.fm-ico{background:rgba(255,255,255,.22);box-shadow:none}
+.fm-x{position:absolute;right:14px;top:14px;width:36px;height:36px;border:0;border-radius:50%;background:rgba(255,255,255,.25);color:#fff;font-size:1rem;cursor:pointer;transition:background .15s,transform .2s}
+.fm-x:hover,.fm-x:focus-visible{background:rgba(255,255,255,.45);transform:rotate(90deg);outline:none}
+.fm-body{padding:20px 22px 24px}.fm-body .btn.dc-btn{margin-top:14px;background:linear-gradient(120deg,#7c3aed,#ec4899);color:#fff;border-color:transparent}
+.faq-modal.closing{animation:fmfadeout .2s ease both}.faq-modal.closing .fm-card{animation:fmout .2s ease both}
+@keyframes fmfade{from{opacity:0}to{opacity:1}}@keyframes fmfadeout{from{opacity:1}to{opacity:0}}
+@keyframes fmpop{from{opacity:0;transform:translateY(28px) scale(.92)}to{opacity:1;transform:none}}
+@keyframes fmout{from{opacity:1;transform:none}to{opacity:0;transform:translateY(14px) scale(.96)}}
+@media (max-width:600px){.faq-modal{align-items:end;padding:0}.fm-card{border-radius:22px 22px 0 0;max-height:88vh}}
+@media (prefers-reduced-motion:reduce){.faq-modal,.fm-card,.faq-modal.closing,.faq-modal.closing .fm-card{animation-duration:.01s}.faq-item,.fm-x{transition:none}}
+.fm-card.f4 .fm-head h3{color:#3b2500}.fm-card.f4 .fm-x{color:#3b2500;background:rgba(255,255,255,.55)}
