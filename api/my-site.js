@@ -42,6 +42,14 @@ const domainBlocked = domain => {
     );
 };
 
+// Everything the dashboard needs to show your site. Also used by /api/bootstrap so the page can load in one go.
+const siteState = async (sql, row) => ({
+    site: row ? view(row) : null,
+    dns: { cname: process.env.DNS_CNAME_TARGET || 'cname.vercel-dns-0.com', a: process.env.DNS_A_TARGET || '76.76.21.21' },
+    free_root: S.normalizeHost(process.env.PLATFORM_ROOT_DOMAIN) || '',
+    events: row ? await listEvents(sql, row.id) : [],
+});
+
 // GET  /api/my-site  -> your site (or { site: null })
 // POST /api/my-site  -> create it: { name, subdomain } for a FREE site (live at once)
 //                       or { name, custom_domain } for your own domain (waits for approval)
@@ -67,12 +75,7 @@ module.exports = async function handler(req, res) {
                 return send(res, 200, { dns_check: await checkDomain(target) });
             }
 
-            return send(res, 200, {
-                site: row ? view(row) : null,
-                dns: { cname: process.env.DNS_CNAME_TARGET || 'cname.vercel-dns-0.com', a: process.env.DNS_A_TARGET || '76.76.21.21' },
-                free_root: S.normalizeHost(process.env.PLATFORM_ROOT_DOMAIN) || '',
-                events: row ? await listEvents(sql, row.id) : [],
-            });
+            return send(res, 200, await siteState(sql, row));
         }
 
         if (req.method !== 'POST' && req.method !== 'PUT') return send(res, 405, { error: 'Method not allowed' });
@@ -206,3 +209,5 @@ module.exports = async function handler(req, res) {
         return send(res, 500, { error: 'Something went wrong. Please try again.' });
     }
 };
+module.exports.siteState = siteState;
+module.exports.findOwn = findOwn;

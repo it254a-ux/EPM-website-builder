@@ -6,16 +6,22 @@
     var WA = '254115533208', WA_SHOW = '+254 115 533 208';
     var FONTS = ['', 'Inter', 'Roboto', 'Poppins', 'DM Sans', 'Lato', 'Nunito', 'Open Sans', 'Montserrat', 'Raleway', 'Source Sans 3'];
     var root = document.getElementById('app');
-    var S = { owner: null, site: null, google: false, freeRoot: '', dns: { cname: 'cname.vercel-dns-0.com', a: '76.76.21.21' }, events: [] };
+    var S = { owner: null, site: null, comm: null, lib: null, google: false, freeRoot: '', dns: { cname: 'cname.vercel-dns-0.com', a: '76.76.21.21' }, events: [] };
     var installEvent = null, viewEl = null, sideEl = null, scrimEl = null, whoEl = null;
 
     /* ---------- helpers ---------- */
+    // Everything the server sends is kept in memory (S.site, S.comm, S.lib), so pages and tabs show at once and refresh quietly.
+    function strip(j) { var c = {}; Object.keys(j).forEach(function (k) { if (k !== '__status') c[k] = j[k]; }); return c; }
+    function same(a, b) { return JSON.stringify(a) === JSON.stringify(b); }
     function api(path, method, body) {
         return fetch(path, {
             method: method || 'GET', credentials: 'same-origin',
             headers: body ? { 'Content-Type': 'application/json' } : undefined,
             body: body ? JSON.stringify(body) : undefined,
-        }).then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { j.__status = r.status; return j; }); })
+        }).then(function (r) { return r.json().catch(function () { return {}; }).then(function (j) { j.__status = r.status;
+                if (r.ok && path.indexOf('/api/commissions') === 0 && j.summary) S.comm = strip(j);
+                if (r.ok && path.indexOf('/api/library') === 0 && j.limits) S.lib = strip(j);
+                return j; }); })
             .catch(function () { return { error: 'Could not reach the server. Check your connection.', __status: 0 }; });
     }
     function el(tag, attrs, kids) {
@@ -186,16 +192,19 @@
         scrimEl = el('div', { class: 'scrim hidden', onclick: closeMenu });
         var menu = el('button', { class: 'menu', 'aria-label': 'Menu', onclick: function () { sideEl.classList.add('open'); scrimEl.classList.remove('hidden'); } }, [svg(ICON.menu)]);
         whoEl = el('div', { class: 'who' }, ['Signed in ', el('b', { text: S.owner.name })]);
-        var logout = el('button', { class: 'btn', text: 'Log out', onclick: function () { api('/api/auth?action=logout', 'POST').then(function () { S.owner = null; S.site = null; authView(false); }); } });
+        var logout = el('button', { class: 'btn', text: 'Log out', onclick: function () { api('/api/auth?action=logout', 'POST').then(function () { S.owner = null; S.site = null; S.comm = null; S.lib = null; authView(false); }); } });
         viewEl = el('main', { id: 'view' });
+        ['input', 'change'].forEach(function (t) { viewEl.addEventListener(t, function () { touched = true; }); });
         root.appendChild(el('div', { class: 'shell' }, [sideEl, el('div', { class: 'main' }, [el('div', { class: 'top' }, [menu, whoEl, logout]), viewEl])]));
         root.appendChild(scrimEl);
         nav.addEventListener('click', closeMenu);
     }
     function closeMenu() { if (sideEl) sideEl.classList.remove('open'); if (scrimEl) scrimEl.classList.add('hidden'); }
 
-    function route() {
+    function route(quiet) {
         if (!S.owner || !viewEl) return;
+        // A newer version of this page was found in the background: take it on this click, unless you are typing.
+        if (updateReady && !quiet && !formDirty()) { location.reload(); return; }
         var path = (location.hash || '#/sites').replace(/^#\//, '');
         var base = path.split('/')[0] || 'sites';
         var views = {
@@ -206,9 +215,12 @@
         };
         var render = views[path] || views[base] || sitesView;
         Array.prototype.forEach.call(sideEl.querySelectorAll('a'), function (a) { a.classList.toggle('on', a.getAttribute('data-route') === base); });
-        clear(viewEl); viewEl.appendChild(render()); window.scrollTo(0, 0);
+        var keep = window.pageYOffset;
+        touched = false;
+        clear(viewEl); viewEl.appendChild(render()); window.scrollTo(0, quiet ? keep : 0);
         var item = NAV.filter(function (n) { return n[0] === base; })[0];
         document.title = (item ? item[1] : 'Dashboard') + ' | EPM';
+        if (!quiet) revalidate(false);
     }
     function go(hash) { if (location.hash === hash) route(); else location.hash = hash; }
 
@@ -466,14 +478,16 @@
             return el('button', { type: 'button', role: 'tab', class: 'tab' + (t[0] === tab ? ' on' : ''), 'aria-selected': t[0] === tab ? 'true' : 'false', text: t[1],
                 onclick: function () { S.commTab = t[0]; route(); } });
         })));
-        var body = el('div', {}, [el('p', { class: 'muted', text: 'Loading…' })]);
+        var body = el('div');
         v.appendChild(body);
-        api('/api/commissions').then(function (d) {
-            if (!viewEl || !viewEl.contains(v)) return; // you moved to another page meanwhile
+        function paint(d, later) {
+            if (later && (!viewEl || !viewEl.contains(v))) return; // you moved to another page meanwhile
             clear(body);
             if (d.error || !d.summary) { body.appendChild(el('div', { class: 'notice bad', text: d.error || 'Could not load your earnings.' })); return; }
             ({ overview: commOverview, history: commHistory, withdraw: commWithdraw, faq: commFaq })[tab](body, d);
-        });
+        }
+        if (S.comm) paint(S.comm, false);                       // already in memory: shown at once
+        else { body.appendChild(el('p', { class: 'muted', text: 'Loading…' })); api('/api/commissions').then(function (d) { paint(d, true); }); }
         return v;
     }
 
@@ -597,14 +611,17 @@
         return { wrap: el('div', {}, [el('label', { text: label }), input, hint ? el('div', { class: 'muted small', text: hint }) : null, err]), input: input, setError: function (m) { err.textContent = m || ''; } };
     }
     function loadLibrary(v, body, render) {
-        api('/api/library').then(function (d) {
-            if (!viewEl || !viewEl.contains(v)) return; // you moved to another page meanwhile
+        function paint(d, later) {
+            if (later && (!viewEl || !viewEl.contains(v))) return; // you moved to another page meanwhile
             clear(body);
             if (d.error || !d.limits) { body.appendChild(el('div', { class: 'notice bad', text: d.error || 'Could not load this page.' })); return; }
             if (!d.site) { body.appendChild(el('div', { class: 'card empty' }, [el('h2', { text: 'Create your site first' }), el('p', { text: 'Bots and documents belong to your site.' }),
                 el('button', { class: 'btn primary', text: 'Create new site', onclick: function () { go('#/sites/new'); } })])); return; }
             render(d);
-        });
+        }
+        if (S.lib) { paint(S.lib, false); return; }              // already in memory: shown at once
+        body.appendChild(el('p', { class: 'muted', text: 'Loading…' }));
+        api('/api/library').then(function (d) { paint(d, true); });
     }
     function tabBar(tabs, current, key) {
         return el('div', { class: 'tabs', role: 'tablist' }, tabs.map(function (t) {
@@ -617,7 +634,7 @@
         var v = el('div'), tab = S.botTab || 'mine';
         v.appendChild(head('Algorithm marketplace', 'Trading bots', 'Add your own bots to your site, or ask us to build one for you.'));
         v.appendChild(tabBar([['mine', 'My bots'], ['request', 'Request a bot']], tab, 'botTab'));
-        var body = el('div', {}, [el('p', { class: 'muted', text: 'Loading…' })]);
+        var body = el('div');
         v.appendChild(body);
         loadLibrary(v, body, function (d) { (tab === 'request' ? botRequests : myBots)(body, d); });
         return v;
@@ -712,7 +729,7 @@
     function strategiesView() {
         var v = el('div');
         v.appendChild(head('Algorithm marketplace', 'Strategies', 'Upload strategy documents that visitors of your site can download.'));
-        var body = el('div', {}, [el('p', { class: 'muted', text: 'Loading…' })]);
+        var body = el('div');
         v.appendChild(body);
         loadLibrary(v, body, function (d) {
             var title = box('Title', el('input', { type: 'text', name: 'title', maxlength: '120', autocomplete: 'off' }));
@@ -846,39 +863,80 @@
             msg.textContent = ''; del.disabled = true;
             api('/api/auth?action=delete_account', 'POST', { password: hasPw ? pw.input.value : undefined, confirm: conf.input.value }).then(function (r) {
                 del.disabled = false;
-                if (r.ok) { S.owner = null; S.site = null; authView(false); toast('Your account has been deleted.'); } else msg.textContent = r.error || 'Could not delete the account.'; }); } });
+                if (r.ok) { S.owner = null; S.site = null; S.comm = null; S.lib = null; authView(false); toast('Your account has been deleted.'); } else msg.textContent = r.error || 'Could not delete the account.'; }); } });
         v.appendChild(el('div', { class: 'card danger-zone' }, [el('h2', { text: 'Danger zone' }),
             el('p', { class: 'muted', text: 'Deleting your account is permanent. Your site goes offline and your settings are removed.' + (hasPw ? '' : ' You signed in with Google, so there is no password to enter.') }), hasPw ? pw.wrap : null, conf.wrap, msg, del]));
         return v;
     }
 
     /* ---------- boot ---------- */
+    // Put a /api/bootstrap answer into memory. Returns true when something actually changed.
+    function applyData(r) {
+        var changed = false, st = r.state || {};
+        function set(key, val) { if (!same(S[key], val)) { S[key] = val; changed = true; } }
+        set('site', st.site || null); set('events', st.events || []);
+        if (st.dns) S.dns = st.dns;
+        if (typeof st.free_root === 'string') S.freeRoot = st.free_root;
+        if (r.commissions) set('comm', strip(r.commissions));
+        if (r.library) set('lib', strip(r.library));
+        return changed;
+    }
+    // Loads everything in one request. Falls back to the single-purpose call if the new one is not there yet.
     function loadSite() {
-        return api('/api/my-site').then(function (s) {
-            if (s.__status === 401) return;
-            S.site = s.site || null; S.events = s.events || []; if (s.dns) S.dns = s.dns; if (typeof s.free_root === 'string') S.freeRoot = s.free_root;
+        return api('/api/bootstrap').then(function (r) {
+            if (r.__status === 401) return;
+            if (r.__status === 200 && r.state) { applyData(r); return; }
+            return api('/api/my-site').then(function (s) {
+                if (s.__status === 401) return;
+                S.site = s.site || null; S.events = s.events || []; if (s.dns) S.dns = s.dns; if (typeof s.free_root === 'string') S.freeRoot = s.free_root;
+            });
         });
     }
-    function boot() {
-        api('/api/auth?action=me').then(function (r) {
-            S.google = !!r.google;
-            if (!r.owner) {
-                S.owner = null;
-                var code = new URLSearchParams(location.search).get('google');
-                if (code) history.replaceState(null, '', location.pathname + location.hash);
-                return authView(code !== 'disabled' && code !== 'admin', code ? (GOOGLE_MESSAGES[code] || GOOGLE_MESSAGES.error) : '');
-            }
-            S.owner = r.owner;
-            if (r.owner.role === 'admin') {
-                clear(root); root.appendChild(el('div', { class: 'auth' }, [el('div', { class: 'card' }, [el('h2', { text: 'Admin account' }), el('p', { class: 'muted', text: 'Use the admin panel to manage sites and accounts.' }), el('a', { class: 'btn primary', href: '/admin', text: 'Go to the admin panel' })])]));
-                return;
-            }
-            loadSite().then(function () { mountShell(); route(); setTimeout(maybeShowInstall, 1500); });
+    // Has the person typed or chosen anything on this page? Then a quiet refresh must not redraw it under them.
+    var touched = false;
+    function formDirty() { return touched; }
+    var lastSync = Date.now(), syncing = false, updateReady = false;
+    // Refresh in the background. The page you are on is only redrawn if something changed and you are not typing.
+    function revalidate(force) {
+        if (!S.owner || S.owner.role === 'admin' || syncing || (!force && Date.now() - lastSync < 8000)) return;
+        syncing = true; lastSync = Date.now();
+        api('/api/bootstrap').then(function (r) {
+            syncing = false;
+            if (r.__status !== 200 || !r.state) return;
+            if (applyData(r) && viewEl && !formDirty()) route(true);
         });
+    }
+    document.addEventListener('visibilitychange', function () { if (document.visibilityState === 'visible') revalidate(true); });
+
+    // One request brings everything. If it is not available (for example while an update is still rolling out), the older two-step start is used.
+    function boot() {
+        api('/api/bootstrap').then(function (r) {
+            if (r.__status === 200 && 'owner' in r) return start(r, true);
+            api('/api/auth?action=me').then(function (m) { start(m, false); });
+        });
+    }
+    function start(r, haveData) {
+        S.google = !!r.google;
+        if (!r.owner) {
+            S.owner = null; S.comm = null; S.lib = null;
+            var code = new URLSearchParams(location.search).get('google');
+            if (code) history.replaceState(null, '', location.pathname + location.hash);
+            return authView(code !== 'disabled' && code !== 'admin', code ? (GOOGLE_MESSAGES[code] || GOOGLE_MESSAGES.error) : '');
+        }
+        S.owner = r.owner;
+        if (r.owner.role === 'admin') {
+            clear(root); root.appendChild(el('div', { class: 'auth' }, [el('div', { class: 'card' }, [el('h2', { text: 'Admin account' }), el('p', { class: 'muted', text: 'Use the admin panel to manage sites and accounts.' }), el('a', { class: 'btn primary', href: '/admin', text: 'Go to the admin panel' })])]));
+            return;
+        }
+        var ready = function () { lastSync = Date.now(); mountShell(); route(); setTimeout(maybeShowInstall, 1500); };
+        if (haveData && r.state) { applyData(r); ready(); } else loadSite().then(ready);
     }
 
-    window.addEventListener('hashchange', route);
+    window.addEventListener('hashchange', function () { route(); });
     window.addEventListener('beforeinstallprompt', function (e) { e.preventDefault(); installEvent = e; if (S.owner) { maybeShowInstall(); if ((location.hash || '').indexOf('settings') > -1) route(); } });
-    if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/app/sw.js', { scope: '/app/' }).catch(function () { /* installability is optional */ }); }
+    if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/app/sw.js', { scope: '/app/' }).catch(function () { /* installability is optional */ });
+        navigator.serviceWorker.addEventListener('message', function (e) { if (e.data && e.data.type === 'epm-updated') updateReady = true; });
+    }
     boot();
 })();

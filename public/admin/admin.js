@@ -219,13 +219,26 @@
         app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Accounts' }), table(['Email', 'Name', 'Role', 'State', ''], ownerRows)]));
     }
 
+    // One request brings every list (the server reads them at the same time). Falls back to separate requests if it is not there yet.
     function load() {
-        Promise.all([api('/api/admin?resource=sites'), api('/api/admin?resource=owners'), api('/api/admin?resource=pool'), api('/api/admin?resource=deriv'), api('/api/admin?resource=commissions'), api('/api/admin?resource=library')]).then(function (r) {
-            if (r[0].__status === 401) return login();
-            if (r[0].__status === 403) { clear(); app.appendChild(el('p', { class: 'err', text: 'This account is not an admin.' })); return; }
-            if (r[0].__status === 404) { clear(); app.appendChild(el('p', { class: 'err', text: 'Admin is not available on this domain.' })); return; }
-            render(r[0].sites || [], r[1].owners || [], r[2] && !r[2].error ? r[2] : { tiers: [], apps: [] }, r[3] && !r[3].error ? r[3] : { enabled: false, configured: false, missing: [] }, r[4] && !r[4].error ? r[4] : { configured: false, months: [], requests: [] }, r[5] && !r[5].error ? r[5] : { bots: [], strategies: [], requests: [], storage_ready: false });
+        api('/api/admin?resource=all').then(function (all) {
+            if (all.__status === 401) return login();
+            if (all.__status === 403) { clear(); app.appendChild(el('p', { class: 'err', text: 'This account is not an admin.' })); return; }
+            if (all.__status === 404) { clear(); app.appendChild(el('p', { class: 'err', text: 'Admin is not available on this domain.' })); return; }
+            if (all.__status === 200 && all.sites) return show(all);
+            Promise.all(['sites', 'owners', 'pool', 'deriv', 'commissions', 'library'].map(function (k) { return api('/api/admin?resource=' + k); })).then(function (r) {
+                if (r[0].__status === 401) return login();
+                show({ sites: r[0], owners: r[1], pool: r[2], deriv: r[3], commissions: r[4], library: r[5] });
+            });
         });
+    }
+    function show(d) {
+        var bad = function (x) { return !x || x.error; };
+        render(d.sites.sites || [], (d.owners && d.owners.owners) || [],
+            bad(d.pool) ? { tiers: [], apps: [] } : d.pool,
+            bad(d.deriv) ? { enabled: false, configured: false, missing: [] } : d.deriv,
+            bad(d.commissions) ? { configured: false, months: [], requests: [] } : d.commissions,
+            bad(d.library) ? { bots: [], strategies: [], requests: [], storage_ready: false } : d.library);
     }
     load();
 })();

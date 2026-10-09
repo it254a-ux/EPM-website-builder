@@ -26,7 +26,7 @@ const audit = (sql, adminId, action, target, detail) =>
 //   2. needs a valid session whose account has role 'admin' (created only by scripts/create-admin.js)
 //   3. state-changing calls must come from the same site (no cross-site posts)
 //
-//   GET  /api/admin?resource=sites | owners | audit | pool | deriv | commissions | library
+//   GET  /api/admin?resource=all | sites | owners | audit | pool | deriv | commissions | library
 //   POST /api/admin  { action: set_status | update_site | approve_custom | connect_domain | create_app | deriv_test | commission_sync | confirm_month | payout_paid | payout_reject | library_remove | library_restore | request_answer | set_app_id | set_markup | pool_add | pool_remove | assign_from_pool | set_rate | disable_owner | delete_site | delete_owner, ... }
 module.exports = async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store');
@@ -38,9 +38,9 @@ module.exports = async function handler(req, res) {
         if (!me) return send(res, 401, { error: 'Please sign in.' });
         if (me.role !== 'admin') return send(res, 403, { error: 'Admins only.' });
 
-        if (req.method === 'GET') {
-            const resource = String(req.query.resource || 'sites');
-            if (resource === 'sites') {
+        // Every list the admin page needs. "all" reads them at the same time, so the page loads in one round trip.
+        const loaders = {
+            sites: async () => {
                 const rows = await sql`
                     SELECT s.id, s.domain, s.name, s.plan, s.status, s.custom_domain_requested, s.commission_rate_override, s.markup_percent, s.app_id, s.app_source,
                            (s.app_id IS NOT NULL AND EXISTS (
@@ -51,32 +51,34 @@ module.exports = async function handler(req, res) {
                     FROM sites s LEFT JOIN owners o ON o.id = s.owner_id
                     ORDER BY s.created_at DESC LIMIT 500
                 `;
-                return send(res, 200, { sites: rows.map(r => ({ ...r, platform_share: effectiveShare(r) })) });
-            }
-            if (resource === 'pool') {
-                const tiers = await sql`
+                return { sites: rows.map(r => ({ ...r, platform_share: effectiveShare(r) })) };
+            },
+            pool: async () => {
+                const [tiers, apps] = await Promise.all([sql`
                     SELECT markup_percent, count(*) FILTER (WHERE assigned_at IS NULL)::int AS free, count(*) FILTER (WHERE assigned_at IS NOT NULL)::int AS used
-                    FROM app_pool GROUP BY markup_percent ORDER BY markup_percent`;
-                const apps = await sql`
+                    FROM app_pool GROUP BY markup_percent ORDER BY markup_percent`,
+                sql`
                     SELECT p.id, p.app_id, p.markup_percent, p.assigned_at, s.domain AS site_domain
-                    FROM app_pool p LEFT JOIN sites s ON s.id = p.site_id ORDER BY p.id DESC LIMIT 300`;
-                return send(res, 200, { tiers: tiers.map(t => ({ ...t, markup_percent: Number(t.markup_percent) })), apps });
+                    FROM app_pool p LEFT JOIN sites s ON s.id = p.site_id ORDER BY p.id DESC LIMIT 300`]);
+                return { tiers: tiers.map(t => ({ ...t, markup_percent: Number(t.markup_percent) })), apps };
+            },
+            // Is the optional automatic app creation on? Names only what is missing, never the token itself.
+            deriv: async () => ({ enabled: deriv.isEnabled(), configured: deriv.isConfigured(), missing: deriv.missingSettings() }),
+            commissions: () => C.adminView(sql),
+            library: () => L.adminView(sql),
+            owners: async () => ({ owners: await sql`SELECT id, email, name, role, disabled, created_at FROM owners ORDER BY created_at DESC LIMIT 500` }),
+            audit: async () => ({ audit: await sql`SELECT id, owner_id, action, target, detail, created_at FROM audit_log ORDER BY id DESC LIMIT 200` }),
+        };
+
+        if (req.method === 'GET') {
+            const resource = String(req.query.resource || 'sites');
+            if (resource === 'all') {
+                const keys = ['sites', 'owners', 'pool', 'deriv', 'commissions', 'library'];
+                const out = await Promise.all(keys.map(k => loaders[k]()));
+                return send(res, 200, Object.fromEntries(keys.map((k, i) => [k, out[i]])));
             }
-            if (resource === 'deriv') {
-                // Is the optional automatic app creation on? Names only what is missing, never the token itself.
-                return send(res, 200, { enabled: deriv.isEnabled(), configured: deriv.isConfigured(), missing: deriv.missingSettings() });
-            }
-            if (resource === 'commissions') return send(res, 200, await C.adminView(sql));
-            if (resource === 'library') return send(res, 200, await L.adminView(sql));
-            if (resource === 'owners') {
-                const rows = await sql`SELECT id, email, name, role, disabled, created_at FROM owners ORDER BY created_at DESC LIMIT 500`;
-                return send(res, 200, { owners: rows });
-            }
-            if (resource === 'audit') {
-                const rows = await sql`SELECT id, owner_id, action, target, detail, created_at FROM audit_log ORDER BY id DESC LIMIT 200`;
-                return send(res, 200, { audit: rows });
-            }
-            return send(res, 400, { error: 'Unknown resource' });
+            if (!Object.prototype.hasOwnProperty.call(loaders, resource)) return send(res, 400, { error: 'Unknown resource' });
+            return send(res, 200, await loaders[resource]());
         }
 
         if (req.method !== 'POST') return send(res, 405, { error: 'Method not allowed' });

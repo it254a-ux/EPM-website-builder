@@ -141,15 +141,17 @@ async function syncRange(sql, from, to) {
 
 // ---------- balances ----------
 async function balances(sql, ownerId) {
-    const e = (await sql`
+    const [e, w] = await Promise.all([
+        sql`
         SELECT COALESCE(SUM(c.owner_usd) FILTER (WHERE m.month IS NOT NULL), 0) AS confirmed,
                COALESCE(SUM(c.owner_usd) FILTER (WHERE m.month IS NULL), 0) AS pending
         FROM commission_daily c LEFT JOIN commission_months m ON m.month = to_char(c.day, 'YYYY-MM')
-        WHERE c.owner_id = ${ownerId}`)[0];
-    const w = (await sql`
+        WHERE c.owner_id = ${ownerId}`.then(r => r[0]),
+        sql`
         SELECT COALESCE(SUM(amount_usd) FILTER (WHERE status = 'requested'), 0) AS requested,
                COALESCE(SUM(amount_usd) FILTER (WHERE status = 'paid'), 0) AS paid
-        FROM payout_requests WHERE owner_id = ${ownerId}`)[0];
+        FROM payout_requests WHERE owner_id = ${ownerId}`.then(r => r[0]),
+    ]);
     const confirmed = num(e.confirmed), requested = num(w.requested), paid = num(w.paid);
     return {
         confirmed, pending: num(e.pending), requested, paid,
@@ -173,25 +175,28 @@ const maskDestination = d => {
 };
 
 async function operatorView(sql, ownerId) {
-    const b = await balances(sql, ownerId);
     const month = todayUtc().slice(0, 7);
-    const last = (await sql`
+    // All the reads run at the same time: one round trip's wait instead of eight.
+    const [b, last, thisMonth, synced, days, months, requests] = await Promise.all([
+        balances(sql, ownerId),
+        sql`
         SELECT to_char(day, 'YYYY-MM-DD') AS day, SUM(owner_usd) AS usd FROM commission_daily
-        WHERE owner_id = ${ownerId} GROUP BY day ORDER BY day DESC LIMIT 1`)[0];
-    const thisMonth = (await sql`
+        WHERE owner_id = ${ownerId} GROUP BY day ORDER BY day DESC LIMIT 1`.then(r => r[0]),
+        sql`
         SELECT COALESCE(SUM(owner_usd), 0) AS usd FROM commission_daily
-        WHERE owner_id = ${ownerId} AND to_char(day, 'YYYY-MM') = ${month}`)[0];
-    const synced = (await sql`SELECT max(synced_at) AS t FROM commission_daily WHERE owner_id = ${ownerId}`)[0];
-    const days = await sql`
+        WHERE owner_id = ${ownerId} AND to_char(day, 'YYYY-MM') = ${month}`.then(r => r[0]),
+        sql`SELECT max(synced_at) AS t FROM commission_daily WHERE owner_id = ${ownerId}`.then(r => r[0]),
+        sql`
         SELECT to_char(day, 'YYYY-MM-DD') AS day, SUM(owner_usd) AS usd FROM commission_daily
-        WHERE owner_id = ${ownerId} GROUP BY day ORDER BY day DESC LIMIT 90`;
-    const months = await sql`
+        WHERE owner_id = ${ownerId} GROUP BY day ORDER BY day DESC LIMIT 90`,
+        sql`
         SELECT to_char(c.day, 'YYYY-MM') AS month, SUM(c.owner_usd) AS usd, (m.month IS NOT NULL) AS confirmed
         FROM commission_daily c LEFT JOIN commission_months m ON m.month = to_char(c.day, 'YYYY-MM')
-        WHERE c.owner_id = ${ownerId} GROUP BY 1, m.month ORDER BY 1 DESC LIMIT 24`;
-    const requests = await sql`
+        WHERE c.owner_id = ${ownerId} GROUP BY 1, m.month ORDER BY 1 DESC LIMIT 24`,
+        sql`
         SELECT id, amount_usd, method, network, destination, status, reference, note, created_at, decided_at
-        FROM payout_requests WHERE owner_id = ${ownerId} ORDER BY id DESC LIMIT 50`;
+        FROM payout_requests WHERE owner_id = ${ownerId} ORDER BY id DESC LIMIT 50`,
+    ]);
     return {
         min_withdrawal: minWithdrawal(),
         summary: {
@@ -258,17 +263,17 @@ async function createWithdrawal(sql, ownerId, v) {
 
 // ---------- what the admin sees ----------
 async function adminView(sql) {
-    const months = await sql`
+    const [months, requests, synced] = await Promise.all([sql`
         SELECT to_char(c.day, 'YYYY-MM') AS month, count(DISTINCT c.day)::int AS days_synced,
                SUM(c.markup_usd) AS markup, SUM(c.owner_usd) AS owner_usd, (m.month IS NOT NULL) AS confirmed
         FROM commission_daily c LEFT JOIN commission_months m ON m.month = to_char(c.day, 'YYYY-MM')
-        GROUP BY 1, m.month ORDER BY 1 DESC LIMIT 12`;
-    const requests = await sql`
+        GROUP BY 1, m.month ORDER BY 1 DESC LIMIT 12`,
+    sql`
         SELECT p.id, p.owner_id, p.amount_usd, p.method, p.network, p.destination, p.status, p.reference, p.note, p.created_at, p.decided_at,
                o.email AS owner_email, o.name AS owner_name, s.domain AS site_domain
         FROM payout_requests p LEFT JOIN owners o ON o.id = p.owner_id LEFT JOIN sites s ON s.owner_id = p.owner_id
-        ORDER BY (p.status = 'requested') DESC, p.id DESC LIMIT 60`;
-    const synced = (await sql`SELECT max(synced_at) AS t FROM commission_daily`)[0];
+        ORDER BY (p.status = 'requested') DESC, p.id DESC LIMIT 60`,
+    sql`SELECT max(synced_at) AS t FROM commission_daily`.then(r => r[0])]);
     return {
         configured: isConfigured(),
         last_synced: synced && synced.t ? synced.t : null,

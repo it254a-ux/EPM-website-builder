@@ -114,11 +114,16 @@ const strategyView = r => ({
 const requestView = r => ({ id: r.id, title: r.title, details: r.details, status: r.status, admin_note: r.admin_note || '', created_at: r.created_at, decided_at: r.decided_at });
 
 async function operatorView(sql, ownerId) {
-    const site = (await sql`SELECT id, name, domain, status FROM sites WHERE owner_id = ${ownerId} LIMIT 1`)[0] || null;
-    const requests = await sql`SELECT id, title, details, status, admin_note, created_at, decided_at FROM site_bot_requests WHERE owner_id = ${ownerId} ORDER BY id DESC LIMIT 50`;
+    // Everything is read at the same time.
+    const [site, requests] = await Promise.all([
+        sql`SELECT id, name, domain, status FROM sites WHERE owner_id = ${ownerId} LIMIT 1`.then(r => r[0] || null),
+        sql`SELECT id, title, details, status, admin_note, created_at, decided_at FROM site_bot_requests WHERE owner_id = ${ownerId} ORDER BY id DESC LIMIT 50`,
+    ]);
     if (!site) return { site: null, bots: [], strategies: [], requests: requests.map(requestView), limits: publicLimits(), storage_ready: storageReady() };
-    const bots = await sql`SELECT id, name, description, market, risk_level, contract_type, status, removed_note, created_at FROM site_bots WHERE site_id = ${site.id} ORDER BY id DESC`;
-    const strategies = await sql`SELECT id, title, description, file_name, size_bytes, blob_url, status, removed_note, created_at FROM site_strategies WHERE site_id = ${site.id} ORDER BY id DESC`;
+    const [bots, strategies] = await Promise.all([
+        sql`SELECT id, name, description, market, risk_level, contract_type, status, removed_note, created_at FROM site_bots WHERE site_id = ${site.id} ORDER BY id DESC`,
+        sql`SELECT id, title, description, file_name, size_bytes, blob_url, status, removed_note, created_at FROM site_strategies WHERE site_id = ${site.id} ORDER BY id DESC`,
+    ]);
     return {
         site: { id: site.id, name: site.name, domain: site.domain },
         bots: bots.map(botView), strategies: strategies.map(strategyView), requests: requests.map(requestView),
@@ -147,15 +152,15 @@ async function publicBot(sql, host, id) {
 }
 
 async function adminView(sql) {
-    const bots = await sql`
+    const [bots, strategies, requests] = await Promise.all([sql`
         SELECT b.id, b.name, b.market, b.risk_level, b.status, b.removed_note, b.created_at, s.domain AS site_domain, o.email AS owner_email
-        FROM site_bots b JOIN sites s ON s.id = b.site_id JOIN owners o ON o.id = b.owner_id ORDER BY b.id DESC LIMIT 200`;
-    const strategies = await sql`
+        FROM site_bots b JOIN sites s ON s.id = b.site_id JOIN owners o ON o.id = b.owner_id ORDER BY b.id DESC LIMIT 200`,
+    sql`
         SELECT t.id, t.title, t.file_name, t.size_bytes, t.blob_url, t.status, t.removed_note, t.created_at, s.domain AS site_domain, o.email AS owner_email
-        FROM site_strategies t JOIN sites s ON s.id = t.site_id JOIN owners o ON o.id = t.owner_id ORDER BY t.id DESC LIMIT 200`;
-    const requests = await sql`
+        FROM site_strategies t JOIN sites s ON s.id = t.site_id JOIN owners o ON o.id = t.owner_id ORDER BY t.id DESC LIMIT 200`,
+    sql`
         SELECT r.id, r.title, r.details, r.status, r.admin_note, r.created_at, o.email AS owner_email, s.domain AS site_domain
-        FROM site_bot_requests r JOIN owners o ON o.id = r.owner_id LEFT JOIN sites s ON s.id = r.site_id ORDER BY (r.status = 'open') DESC, r.id DESC LIMIT 200`;
+        FROM site_bot_requests r JOIN owners o ON o.id = r.owner_id LEFT JOIN sites s ON s.id = r.site_id ORDER BY (r.status = 'open') DESC, r.id DESC LIMIT 200`]);
     return { bots, strategies, requests, storage_ready: storageReady() };
 }
 

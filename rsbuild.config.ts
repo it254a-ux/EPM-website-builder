@@ -12,6 +12,9 @@ export default defineConfig({
         attrs: {
           rel: 'stylesheet',
           href: 'https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Playfair+Display:wght@500;600;700&display=swap',
+          // Loads without holding the page back: text shows at once in a plain font, then switches when the font arrives.
+          media: 'print',
+          onload: "this.media='all'",
         },
       },
     ],
