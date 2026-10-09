@@ -281,6 +281,7 @@
         defs.appendChild(g); s.appendChild(defs);
         s.appendChild(nsEl('path', { d: line + ' L' + W + ' ' + H + ' L0 ' + H + ' Z', fill: 'url(#' + id + ')', stroke: 'none' }));
         s.appendChild(nsEl('path', { d: line, fill: 'none', stroke: col, 'stroke-width': '1.8', 'stroke-linejoin': 'round', 'stroke-linecap': 'round', 'vector-effect': 'non-scaling-stroke', pathLength: '1', 'class': 'ln' }));
+        s.isUp = up;
         return s;
     }
     function candleSvg(seed) {
@@ -304,14 +305,21 @@
         s.appendChild(nsEl('path', { d: ma, fill: 'none', stroke: '#c9a24b', 'stroke-width': '1.6', 'stroke-linejoin': 'round', 'vector-effect': 'non-scaling-stroke' }));
         return s;
     }
-    function marketStrip() {
-        var tiles = [['Volatility 100', 11, 1.1], ['Volatility 50', 27, 0.5], ['Boom 1000', 42, 1.6], ['Crash 1000', 58, -1.4]];
-        var grid = el('div', { class: 'mkt-grid' }, tiles.map(function (t) {
-            return el('div', { class: 'mkt-tile' }, [el('b', { text: t[0] }), el('small', { text: 'Synthetic index' }), sparkSvg(t[1], t[2])]);
+    var MK_SETS = {
+        sites: { title: 'Market watch', seed: 7, tiles: [['Volatility 100', 11, 1.1], ['Volatility 50', 27, 0.5], ['Boom 1000', 42, 1.6], ['Crash 1000', 58, -1.4]] },
+        bots: { title: 'Popular markets', seed: 19, tiles: [['Volatility 75', 5, 1.2], ['Volatility 25', 19, -0.6], ['Step Index', 33, 0.9], ['Jump 100', 64, -1.1]] },
+        pulse: { title: 'Market pulse', seed: 31, tiles: [['Volatility 10', 8, 0.7], ['Boom 500', 21, 1.4], ['Crash 500', 37, -1.2], ['Range Break 100', 71, 0.4]] },
+        earn: { title: 'Market activity', seed: 43, tiles: [['Volatility 100 (1s)', 13, 1.0], ['Boom 300', 29, 1.5], ['Crash 300', 46, -1.0], ['Volatility 50 (1s)', 52, 0.3]] },
+    };
+    function marketStrip(kind) {
+        var set = MK_SETS[kind] || MK_SETS.sites;
+        var grid = el('div', { class: 'mkt-grid' }, set.tiles.map(function (t) {
+            var line = sparkSvg(t[1], t[2]);
+            return el('div', { class: 'mkt-tile' }, [el('b', {}, [t[0], el('i', { class: 'mkt-dir ' + (line.isUp ? 'up' : 'down'), text: line.isUp ? '\u25b2' : '\u25bc' })]), el('small', { text: 'Synthetic index' }), line]);
         }));
         return el('div', { class: 'card mkt', role: 'img', 'aria-label': 'Illustrative market charts, not live prices' }, [
-            el('div', { class: 'mkt-head' }, [el('h2', { text: 'Market watch' }), el('span', { class: 'mkt-tag', text: 'Illustrative \u00b7 not live prices' })]),
-            grid, el('div', { class: 'mkt-candles' }, [candleSvg(7)]),
+            el('div', { class: 'mkt-head' }, [el('h2', { text: set.title }), el('span', { class: 'mkt-tag', text: 'Illustrative \u00b7 not live prices' })]),
+            grid, el('div', { class: 'mkt-candles' }, [candleSvg(set.seed)]),
             el('p', { class: 'muted small', style: 'margin:8px 0 0', text: 'Sample charts for illustration only. They are not real prices and not trading advice.' })]);
     }
 
@@ -648,6 +656,7 @@
             clear(body);
             if (d.error || !d.summary) { body.appendChild(el('div', { class: 'notice bad', text: d.error || 'Could not load your earnings.' })); return; }
             ({ overview: commOverview, history: commHistory, withdraw: commWithdraw, faq: commFaq })[tab](body, d);
+            if (tab === 'overview') body.appendChild(marketStrip('earn'));
         }
         if (S.comm) paint(S.comm, false);                       // already in memory: shown at once
         else { body.appendChild(el('p', { class: 'muted', text: 'Loading…' })); api('/api/commissions').then(function (d) { paint(d, true); }); }
@@ -799,7 +808,7 @@
         v.appendChild(tabBar([['mine', 'My bots'], ['request', 'Request a bot']], tab, 'botTab'));
         var body = el('div');
         v.appendChild(body);
-        loadLibrary(v, body, function (d) { (tab === 'request' ? botRequests : myBots)(body, d); });
+        loadLibrary(v, body, function (d) { (tab === 'request' ? botRequests : myBots)(body, d); body.appendChild(marketStrip('bots')); });
         return v;
     }
 
@@ -973,6 +982,7 @@
             hist.appendChild(ul);
         }
         v.appendChild(hist);
+        v.appendChild(marketStrip('pulse'));
         return v;
     }
 

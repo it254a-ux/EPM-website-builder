@@ -283,3 +283,13 @@ td{overflow-wrap:anywhere}
  .mkt-candles{margin-top:8px;padding:6px}
  .mkt-candles svg{height:104px}
 }
+.mkt-dir{margin-left:6px;font-size:.6rem;font-style:normal;vertical-align:middle}
+.mkt-dir.up{color:#19a57a}.mkt-dir.down{color:#d9534f}
+/* Phones: number boxes sit two per row, a lone last one spans the width (less scrolling) */
+@media(max-width:600px){
+ .stats{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .stats>.stat:nth-child(odd):last-child{grid-column:1/-1}
+ .stat{min-width:0}
+ .stat b{overflow-wrap:anywhere}
+}
+@media(max-width:600px){.stat small{font-size:.6rem;letter-spacing:.05em}}
