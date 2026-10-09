@@ -256,6 +256,65 @@
             else { say('Still waiting. If you paid, this page will update within a few minutes.', ''); btn.disabled = false; }
         });
     }
+
+    /* ---------- illustrative market charts (sample shapes only, never real prices) ---------- */
+    var SVGNS = 'http://www.w3.org/2000/svg', mkId = 0;
+    function nsEl(tag, attrs) {
+        var e = document.createElementNS(SVGNS, tag);
+        Object.keys(attrs || {}).forEach(function (k) { e.setAttribute(k, attrs[k]); });
+        return e;
+    }
+    function rng(seed) { // small seeded generator, so the charts look the same every time
+        return function () { seed |= 0; seed = seed + 0x6D2B79F5 | 0; var t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    }
+    function sparkSvg(seed, drift) {
+        var r = rng(seed), y = 50, vals = [], i, W = 120, H = 44, pad = 3;
+        for (i = 0; i < 30; i++) { y += (r() - 0.5) * 14 + drift; vals.push(y); }
+        var min = Math.min.apply(null, vals), max = Math.max.apply(null, vals), span = (max - min) || 1;
+        var pts = vals.map(function (v, k) { return [(k / (vals.length - 1)) * W, H - pad - ((v - min) / span) * (H - pad * 2)]; });
+        var line = pts.map(function (q, k) { return (k ? 'L' : 'M') + q[0].toFixed(1) + ' ' + q[1].toFixed(1); }).join(' ');
+        var up = vals[vals.length - 1] >= vals[0], col = up ? '#19a57a' : '#d9534f', id = 'mkg' + (++mkId);
+        var s = nsEl('svg', { viewBox: '0 0 ' + W + ' ' + H, preserveAspectRatio: 'none', 'aria-hidden': 'true', 'class': 'mkt-line' });
+        var defs = nsEl('defs'), g = nsEl('linearGradient', { id: id, x1: '0', y1: '0', x2: '0', y2: '1' });
+        g.appendChild(nsEl('stop', { offset: '0', 'stop-color': col, 'stop-opacity': '0.28' }));
+        g.appendChild(nsEl('stop', { offset: '1', 'stop-color': col, 'stop-opacity': '0' }));
+        defs.appendChild(g); s.appendChild(defs);
+        s.appendChild(nsEl('path', { d: line + ' L' + W + ' ' + H + ' L0 ' + H + ' Z', fill: 'url(#' + id + ')', stroke: 'none' }));
+        s.appendChild(nsEl('path', { d: line, fill: 'none', stroke: col, 'stroke-width': '1.8', 'stroke-linejoin': 'round', 'stroke-linecap': 'round', 'vector-effect': 'non-scaling-stroke', pathLength: '1', 'class': 'ln' }));
+        return s;
+    }
+    function candleSvg(seed) {
+        var r = rng(seed), n = 26, W = 260, H = 110, price = 55, cs = [], i;
+        for (i = 0; i < n; i++) {
+            var o = price, c = o + (r() - 0.46) * 12;
+            cs.push({ o: o, c: c, hi: Math.max(o, c) + r() * 5, lo: Math.min(o, c) - r() * 5 }); price = c;
+        }
+        var min = Math.min.apply(null, cs.map(function (k) { return k.lo; })), max = Math.max.apply(null, cs.map(function (k) { return k.hi; })), span = (max - min) || 1;
+        function Y(v) { return 6 + (H - 12) * (1 - (v - min) / span); }
+        var step = W / n, s = nsEl('svg', { viewBox: '0 0 ' + W + ' ' + H, preserveAspectRatio: 'none', 'aria-hidden': 'true' });
+        for (i = 1; i < 4; i++) s.appendChild(nsEl('line', { x1: '0', x2: String(W), y1: String(H * i / 4), y2: String(H * i / 4), stroke: '#eee8d8', 'stroke-width': '1', 'vector-effect': 'non-scaling-stroke' }));
+        cs.forEach(function (k, idx) {
+            var x = (idx + 0.5) * step, col = k.c >= k.o ? '#19a57a' : '#d9534f';
+            s.appendChild(nsEl('line', { x1: x.toFixed(1), x2: x.toFixed(1), y1: Y(k.hi).toFixed(1), y2: Y(k.lo).toFixed(1), stroke: col, 'stroke-width': '1.2', 'vector-effect': 'non-scaling-stroke' }));
+            s.appendChild(nsEl('rect', { x: (x - step * 0.3).toFixed(1), width: (step * 0.6).toFixed(1), y: Y(Math.max(k.o, k.c)).toFixed(1), height: Math.max(1.5, Math.abs(Y(k.o) - Y(k.c))).toFixed(1), rx: '1', fill: col }));
+        });
+        var ma = cs.map(function (k, idx) { // 5-candle moving average, in the brand gold
+            var a = cs.slice(Math.max(0, idx - 4), idx + 1), m = a.reduce(function (t, z) { return t + z.c; }, 0) / a.length;
+            return (idx ? 'L' : 'M') + ((idx + 0.5) * step).toFixed(1) + ' ' + Y(m).toFixed(1); }).join(' ');
+        s.appendChild(nsEl('path', { d: ma, fill: 'none', stroke: '#c9a24b', 'stroke-width': '1.6', 'stroke-linejoin': 'round', 'vector-effect': 'non-scaling-stroke' }));
+        return s;
+    }
+    function marketStrip() {
+        var tiles = [['Volatility 100', 11, 1.1], ['Volatility 50', 27, 0.5], ['Boom 1000', 42, 1.6], ['Crash 1000', 58, -1.4]];
+        var grid = el('div', { class: 'mkt-grid' }, tiles.map(function (t) {
+            return el('div', { class: 'mkt-tile' }, [el('b', { text: t[0] }), el('small', { text: 'Synthetic index' }), sparkSvg(t[1], t[2])]);
+        }));
+        return el('div', { class: 'card mkt', role: 'img', 'aria-label': 'Illustrative market charts, not live prices' }, [
+            el('div', { class: 'mkt-head' }, [el('h2', { text: 'Market watch' }), el('span', { class: 'mkt-tag', text: 'Illustrative \u00b7 not live prices' })]),
+            grid, el('div', { class: 'mkt-candles' }, [candleSvg(7)]),
+            el('p', { class: 'muted small', style: 'margin:8px 0 0', text: 'Sample charts for illustration only. They are not real prices and not trading advice.' })]);
+    }
+
     function sitesView() {
         var v = el('div'), site = S.site;
         v.appendChild(el('div', { class: 'row between' }, [head('Welcome ' + S.owner.name.split(' ')[0], 'Your sites'),
@@ -267,6 +326,7 @@
                 el('h2', {}, ['No sites yet.', el('span', { text: 'Let\u2019s build your first one!' })]),
                 el('p', { text: 'Choose a free address that goes live instantly, or connect your own domain. Add your branding and you are ready.' }),
                 el('a', { class: 'btn primary', href: '#/sites/new', text: '+ Create your first site' })]));
+            v.appendChild(marketStrip());
             return v;
         }
         var card = el('div', { class: 'card' }, [
@@ -875,6 +935,7 @@
                         api('/api/library', 'POST', { action: 'delete_strategy', id: s.id }).then(function (x) { if (x.strategies) { toast('Document deleted.'); route(); } else toast(x.error || 'Could not delete.'); }); } })];
             })));
             body.appendChild(list);
+            body.appendChild(marketStrip());
         });
         return v;
     }

@@ -2,8 +2,8 @@
 //   - Its own files (page, script, styles, icons) are served from the device at once, then quietly refreshed.
 //     When a newer script is found the page is told, and it reloads on your next click (never while you are typing).
 //   - Account data (/api/...) is NEVER stored here: it always comes live from the server.
-const CACHE = 'epm-app-v3';
-const SHELL = ['/app/index.html', '/app/owner.js?v=3', '/app/owner.css?v=3', '/app/manifest.webmanifest', '/app/icon-192.png', '/app/icon-512.png'];
+const CACHE = 'epm-app-v4';
+const SHELL = ['/app/index.html', '/app/owner.js?v=4', '/app/owner.css?v=4', '/app/manifest.webmanifest', '/app/icon-192.png', '/app/icon-512.png'];
 
 self.addEventListener('install', event => {
     event.waitUntil(caches.open(CACHE).then(c => Promise.all(SHELL.map(u => c.add(u).catch(() => {})))).then(() => self.skipWaiting()));
