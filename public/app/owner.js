@@ -516,7 +516,7 @@
                 clear(out);
                 var wb = walletAvail(), canWallet = wb >= Number(d.price_usd);
                 if (!price && !canWallet) { out.appendChild(el('div', { class: 'notice bad', text: 'Shilling prices are not available right now, so buying with M-Pesa is paused. Please try again later.' })); return; }
-                var f = { phone: field('phone', 'Your M-Pesa number', 'tel', '', 'The number that will get the payment prompt, for example 0712345678.'),
+                var f = { phone: field('phone', 'Your phone number', 'tel', '', 'Gets the M-Pesa prompt, and is the owner\u2019s phone for the registry. For example 0712345678.'),
                     first_name: field('first_name', 'First name', 'text', ''), last_name: field('last_name', 'Last name', 'text', ''),
                     address1: field('address1', 'Street address', 'text', ''), city: field('city', 'Town or city', 'text', ''),
                     state: field('state', 'County or region', 'text', ''), zip: field('zip', 'Postal code', 'text', '', 'Use 00100 if you are not sure.'),
