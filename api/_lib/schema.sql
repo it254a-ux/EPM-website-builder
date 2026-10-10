@@ -257,3 +257,13 @@ CREATE UNIQUE INDEX IF NOT EXISTS domain_orders_checkout_idx ON domain_orders (m
 ALTER TABLE sites ADD COLUMN IF NOT EXISTS domain_bought_here BOOLEAN NOT NULL DEFAULT false;
 ALTER TABLE sites ADD COLUMN IF NOT EXISTS domain_expires_at TIMESTAMPTZ;
 ALTER TABLE sites ADD COLUMN IF NOT EXISTS domain_paused_at TIMESTAMPTZ;
+
+-- Which expiry reminder emails were already sent, so nobody is emailed twice for the same expiry date.
+CREATE TABLE IF NOT EXISTS domain_reminders (
+    id         SERIAL PRIMARY KEY,
+    site_id    INTEGER NOT NULL REFERENCES sites(id) ON DELETE CASCADE,
+    level      TEXT NOT NULL,                       -- d30 | d14 | d7 | expired
+    expires_on DATE NOT NULL,                       -- the expiry date the reminder was about (changes after a renewal)
+    sent_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    UNIQUE (site_id, level, expires_on)
+);

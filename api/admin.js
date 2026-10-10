@@ -67,12 +67,23 @@ module.exports = async function handler(req, res) {
             deriv: async () => ({ enabled: deriv.isEnabled(), configured: deriv.isConfigured(), missing: deriv.missingSettings() }),
             commissions: () => C.adminView(sql),
             library: () => L.adminView(sql),
-            domain_orders: async () => ({ orders: (await sql`
-                SELECT d.id, d.kind, d.domain, d.status, d.price_kes, d.price_usd_cents, d.cost_usd_cents, d.mpesa_receipt, d.paid_kes, d.phone, d.failure_reason, d.refund_reference,
-                       d.vercel_order_id, d.attempts, d.created_at, d.paid_at, d.completed_at, o.email AS owner_email, o.name AS owner_name
-                FROM domain_orders d JOIN owners o ON o.id = d.owner_id
-                ORDER BY (d.status IN ('refund_due', 'check_needed', 'paid', 'buying')) DESC, d.id DESC LIMIT 60`).map(r => ({
-                    ...r, price_usd: r.price_usd_cents / 100, cost_usd: r.cost_usd_cents / 100, price_usd_cents: undefined, cost_usd_cents: undefined })) }),
+            domain_orders: async () => {
+                const rows = await sql`
+                    SELECT d.id, d.kind, d.domain, d.status, d.price_kes, d.price_usd_cents, d.cost_usd_cents, d.mpesa_receipt, d.paid_kes, d.phone, d.failure_reason, d.refund_reference,
+                           d.vercel_order_id, d.attempts, d.created_at, d.paid_at, d.completed_at, o.email AS owner_email, o.name AS owner_name
+                    FROM domain_orders d JOIN owners o ON o.id = d.owner_id
+                    ORDER BY (d.status IN ('refund_due', 'check_needed', 'paid', 'buying')) DESC, d.id DESC LIMIT 60`;
+                // Totals cover every finished order, not just the 60 shown. Margin = what the operator paid minus what the registrar charged you,
+                // before M-Pesa fees and exchange-rate movement (the 4% buffer is meant to cover those).
+                const t = (await sql`SELECT count(*)::int AS orders, COALESCE(sum(paid_kes), sum(price_kes), 0)::bigint AS revenue_kes,
+                                            COALESCE(sum(price_usd_cents - cost_usd_cents), 0)::bigint AS margin_cents
+                                     FROM domain_orders WHERE status = 'completed'`)[0];
+                return {
+                    totals: { orders: t.orders, revenue_kes: Number(t.revenue_kes), margin_usd: Number(t.margin_cents) / 100 },
+                    orders: rows.map(r => ({ ...r, price_usd: r.price_usd_cents / 100, cost_usd: r.cost_usd_cents / 100, margin_usd: (r.price_usd_cents - r.cost_usd_cents) / 100,
+                        price_usd_cents: undefined, cost_usd_cents: undefined })),
+                };
+            },
             owners: async () => ({ owners: await sql`SELECT id, email, name, role, disabled, created_at FROM owners ORDER BY created_at DESC LIMIT 500` }),
             audit: async () => ({ audit: await sql`SELECT id, owner_id, action, target, detail, created_at FROM audit_log ORDER BY id DESC LIMIT 200` }),
         };

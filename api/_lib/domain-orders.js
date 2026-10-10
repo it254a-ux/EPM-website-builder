@@ -8,6 +8,7 @@ const VD = require('./vercel-domains');
 const { logEvent } = require('./events');
 const { syncAppToDeriv, reasonOf } = require('./site-app');
 const S = require('./site-settings');
+const Reminders = require('./domain-reminders');
 
 const PAY_WINDOW_MINUTES = 10;
 
@@ -174,7 +175,9 @@ async function sweep(sql) {
     const paid = await sql`SELECT id FROM domain_orders WHERE status = 'paid' ORDER BY id LIMIT 20`;
     for (const p of paid) await fulfil(sql, p.id);
     const pausedSites = await pauseExpired(sql);
-    return { stuck: stuck.length, retried: paid.length, paused: pausedSites };
+    let reminders = { sent: 0, failed: 0 };
+    try { reminders = await Reminders.sendReminders(sql); } catch (err) { console.error('reminders error:', err && err.message); }
+    return { stuck: stuck.length, retried: paid.length, paused: pausedSites, reminders };
 }
 
 module.exports = { PAY_WINDOW_MINUTES, fulfil, sweep, pauseExpired, activatePurchase, applyRenewal, MESSAGES, view, get, expireStale, markPaid, confirmWaiting, applyCallback };

@@ -284,3 +284,18 @@ test('admin retry buys it now', async () => {
     assert.equal((await row(id)).status, 'completed');
     assert.equal((await site()).domain, 'mybrand.com');
 });
+
+test('admin sees the margin on each finished sale and the totals; operators never do', async () => {
+    const adm = await login('admin', 'a@example.com');
+    const { op, id } = await paidOrder();
+    await report();                                                       // paid, bought, completed
+    const list = (await call(admin, { query: { resource: 'domain_orders' }, cookie: adm.cookie })).body;
+    assert.equal(list.orders[0].id, id);
+    assert.equal(list.orders[0].status, 'completed');
+    assert.equal(list.orders[0].margin_usd, 2.56);                        // 13.81 paid by the operator minus 11.25 charged by Vercel
+    assert.equal(list.totals.orders, 1);
+    assert.equal(list.totals.revenue_kes, 1800);
+    assert.equal(list.totals.margin_usd, 2.56);
+    const seen = JSON.stringify((await call(domains, { query: { orders: '1' }, cookie: op.cookie })).body);
+    assert.ok(!/margin|cost/.test(seen));
+});

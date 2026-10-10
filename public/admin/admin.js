@@ -163,11 +163,14 @@
                         if (confirm('Try to register ' + o.domain + ' again? If it is already registered, Vercel will refuse and nothing is charged twice.')) act({ action: 'order_retry', id: o.id }); } }));
                     var needs = ['refund_due', 'check_needed', 'paid', 'buying'].indexOf(o.status) >= 0;
                     return [new Date(o.created_at).toLocaleString(), (o.owner_name || '') + ' ' + (o.owner_email || ''), o.domain + (o.kind === 'renewal' ? ' (renewal)' : ''),
-                        'KES ' + (o.paid_kes || o.price_kes) + (o.mpesa_receipt ? ' · ' + o.mpesa_receipt : ''), 'Vercel cost $' + Number(o.cost_usd).toFixed(2),
+                        'KES ' + (o.paid_kes || o.price_kes) + (o.mpesa_receipt ? ' · ' + o.mpesa_receipt : ''), '$' + Number(o.cost_usd).toFixed(2) + ' cost',
+                        o.status === 'completed' ? '$' + Number(o.margin_usd).toFixed(2) : '—',
                         el('span', { class: needs ? 'pill bad' : 'pill', text: o.status }), (o.failure_reason || '') + (o.refund_reference ? ' Refund ' + o.refund_reference : ''), btns];
                 });
+                var tot = r.totals || { orders: 0, revenue_kes: 0, margin_usd: 0 };
+                holder.appendChild(el('p', {}, [el('strong', { text: tot.orders + (tot.orders === 1 ? ' finished order' : ' finished orders') }), ' \u00b7 KES ' + Number(tot.revenue_kes).toLocaleString('en-KE') + ' received \u00b7 margin $' + Number(tot.margin_usd).toFixed(2) + ' before M-Pesa fees']));
                 holder.appendChild(el('p', { class: 'muted', text: 'Orders that need you come first. Money is only taken after Safaricom confirms it.' }));
-                holder.appendChild(rows.length ? table(['Created', 'Operator', 'Domain', 'Paid', 'Your cost', 'Status', 'Note', ''], rows) : el('p', { class: 'muted', text: 'No domain orders yet.' }));
+                holder.appendChild(rows.length ? table(['Created', 'Operator', 'Domain', 'Paid', 'Your cost', 'Margin', 'Status', 'Note', ''], rows) : el('p', { class: 'muted', text: 'No domain orders yet.' }));
             });
         })();
 
