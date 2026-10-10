@@ -7,7 +7,8 @@
     "dev": "rsbuild dev --port 4003",
     "build": "rsbuild build",
     "type-check": "tsc --noEmit",
-    "test:api": "node --test api/__tests__/*.test.js"
+    "test:api": "node --test api/__tests__/*.test.js",
+    "test:pages": "node --test test/*.test.js"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
@@ -24,6 +25,7 @@
     "@rsbuild/plugin-react": "^1.0.1",
     "@types/react": "^18.3.3",
     "@types/react-dom": "^18.3.0",
+    "jsdom": "^30.1.2",
     "typescript": "^5.5.3"
   }
 }
