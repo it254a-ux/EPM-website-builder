@@ -16,6 +16,7 @@
 //   DERIV_API_BASE      default https://api.derivws.com
 //   WITHDRAWAL_MIN_USD  smallest withdrawal, default 10
 const S = require('./site-settings');
+const W = require('./wallet');
 
 const env = k => String(process.env[k] || '').trim();
 const STATS_PATH = '/applications/v1/markup-statistics';
@@ -141,7 +142,7 @@ async function syncRange(sql, from, to) {
 
 // ---------- balances ----------
 async function balances(sql, ownerId) {
-    const [e, w] = await Promise.all([
+    const [e, w, spent] = await Promise.all([
         sql`
         SELECT COALESCE(SUM(c.owner_usd) FILTER (WHERE m.month IS NOT NULL), 0) AS confirmed,
                COALESCE(SUM(c.owner_usd) FILTER (WHERE m.month IS NULL), 0) AS pending
@@ -151,11 +152,12 @@ async function balances(sql, ownerId) {
         SELECT COALESCE(SUM(amount_usd) FILTER (WHERE status = 'requested'), 0) AS requested,
                COALESCE(SUM(amount_usd) FILTER (WHERE status = 'paid'), 0) AS paid
         FROM payout_requests WHERE owner_id = ${ownerId}`.then(r => r[0]),
+        sql`SELECT COALESCE(SUM(amount_usd), 0) AS used FROM wallet_debits WHERE owner_id = ${ownerId} AND status IN ('held', 'spent')`.then(r => r[0]),
     ]);
-    const confirmed = num(e.confirmed), requested = num(w.requested), paid = num(w.paid);
+    const confirmed = num(e.confirmed), requested = num(w.requested), paid = num(w.paid), used = num(spent.used);
     return {
-        confirmed, pending: num(e.pending), requested, paid,
-        available: Math.max(0, floorCents(confirmed - requested - paid)),
+        confirmed, pending: num(e.pending), requested, paid, used,
+        available: Math.max(0, floorCents(confirmed - requested - paid - used)),
     };
 }
 
@@ -177,7 +179,7 @@ const maskDestination = d => {
 async function operatorView(sql, ownerId) {
     const month = todayUtc().slice(0, 7);
     // All the reads run at the same time: one round trip's wait instead of eight.
-    const [b, last, thisMonth, synced, days, months, requests] = await Promise.all([
+    const [b, last, thisMonth, synced, days, months, requests, wallet] = await Promise.all([
         balances(sql, ownerId),
         sql`
         SELECT to_char(day, 'YYYY-MM-DD') AS day, SUM(owner_usd) AS usd FROM commission_daily
@@ -196,11 +198,13 @@ async function operatorView(sql, ownerId) {
         sql`
         SELECT id, amount_usd, method, network, destination, status, reference, note, created_at, decided_at
         FROM payout_requests WHERE owner_id = ${ownerId} ORDER BY id DESC LIMIT 50`,
+        W.history(sql, ownerId),
     ]);
     return {
+        wallet,
         min_withdrawal: minWithdrawal(),
         summary: {
-            available: b.available, pending: cents(b.pending), requested: cents(b.requested), paid: cents(b.paid),
+            available: b.available, pending: cents(b.pending), requested: cents(b.requested), paid: cents(b.paid), spent: cents(b.used),
             this_month: cents(thisMonth.usd), this_month_label: month,
             latest_day: last ? last.day : null, latest_day_amount: last ? cents(last.usd) : 0,
             last_updated: synced && synced.t ? synced.t : null,
@@ -256,9 +260,16 @@ async function createWithdrawal(sql, ownerId, v) {
         SELECT ${ownerId}::int, ${v.amount}::numeric, ${v.method}::text, ${v.network}::text, ${v.destination}::text
         WHERE ${v.amount}::numeric <= (
             COALESCE((SELECT SUM(c.owner_usd) FROM commission_daily c JOIN commission_months m ON m.month = to_char(c.day, 'YYYY-MM') WHERE c.owner_id = ${ownerId}::int), 0)
-          - COALESCE((SELECT SUM(p.amount_usd) FROM payout_requests p WHERE p.owner_id = ${ownerId}::int AND p.status IN ('requested', 'paid')), 0))
+          - COALESCE((SELECT SUM(p.amount_usd) FROM payout_requests p WHERE p.owner_id = ${ownerId}::int AND p.status IN ('requested', 'paid')), 0)
+          - COALESCE((SELECT SUM(d.amount_usd) FROM wallet_debits d WHERE d.owner_id = ${ownerId}::int AND d.status IN ('held', 'spent')), 0))
         RETURNING id`;
-    return rows.length ? rows[0].id : null;
+    if (!rows.length) return null;
+    // A wallet payment may have landed at the same instant: if the balance went below zero, undo this request.
+    if ((await W.available(sql, ownerId)).raw < -0.000001) {
+        await sql`UPDATE payout_requests SET status = 'cancelled', note = 'Balance changed at the same moment', decided_at = now() WHERE id = ${rows[0].id} AND status = 'requested'`;
+        return null;
+    }
+    return rows[0].id;
 }
 
 // ---------- what the admin sees ----------

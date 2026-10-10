@@ -211,7 +211,7 @@ test('only the operator\'s own earnings are shown, and never markup, volume, con
     await call(commissionsApi, { method: 'POST', cookie: a.cookie, body: { action: 'withdraw', amount: '10', method: 'mpesa', destination: '0712345678' } });
     const v = (await call(commissionsApi, { cookie: a.cookie })).body;
     const text = JSON.stringify(v);
-    assert.deepEqual(Object.keys(v).sort(), ['days', 'min_withdrawal', 'months', 'requests', 'summary']);
+    assert.deepEqual(Object.keys(v).sort(), ['days', 'min_withdrawal', 'months', 'requests', 'summary', 'wallet']);
     assert.equal(/markup|volume|contract|client|share|app_id|platform/i.test(Object.keys(JSON.parse(text)).concat(Object.keys(v.summary), Object.keys(v.days[0]), Object.keys(v.months[0]), Object.keys(v.requests[0])).join(' ')), false);
     assert.equal(v.summary.available + v.summary.requested, 30);
     assert.equal(text.includes('0712345678') || text.includes('254712345678'), false, 'the full phone number is masked');

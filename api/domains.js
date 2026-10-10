@@ -5,6 +5,7 @@ const P = require('./_lib/domain-pricing');
 const FX = require('./_lib/fx');
 const M = require('./_lib/mpesa');
 const DO = require('./_lib/domain-orders');
+const W = require('./_lib/wallet');
 
 const send = (res, code, body) => res.status(code).json(body);
 
@@ -68,9 +69,10 @@ function readContact(b, email, phoneIntl) {
 
 async function placeOrder(sql, me, req, res, body) {
     if ((await A.hit(sql, `domainorder:owner:${me.id}`, 3600)) > 12) return send(res, 429, { error: 'Too many attempts. Please wait a while.' });
-    if (!M.isConfigured()) return send(res, 503, { error: 'Payments are not switched on yet. Please try again later.' });
+    const wallet = body.pay === 'wallet';
+    if (!wallet && !M.isConfigured()) return send(res, 503, { error: 'Payments are not switched on yet. Please try again later.' });
     const rate = await FX.currentRate(sql);
-    if (!rate) return send(res, 503, { error: 'Prices in shillings are not available right now. Please try again later.' });
+    if (!rate && !wallet) return send(res, 503, { error: 'Prices in shillings are not available right now. Please try again later.' });
 
     const site = await ownSite(sql, me.id);
     if (!site) return send(res, 400, { error: 'Create your site first.' });
@@ -89,13 +91,27 @@ async function placeOrder(sql, me, req, res, body) {
     const hit = found.ok && found.results.find(r => r.domain === domain);
     if (!found.ok) return send(res, 502, { error: 'Could not check the domain right now. Please try again in a minute.' });
     if (!hit || !hit.available || hit.premium || hit.years !== 1 || !hit.costCents || !hit.renewalCents) return send(res, 409, { error: 'That domain is no longer available. Please search again.' });
-    const s = { ...P.settings(), kesPerUsd: rate.rate };
+    const s = { ...P.settings(), kesPerUsd: rate ? rate.rate : 0 };
     const first = P.priceFor(hit.costCents / 100, s), renew = P.priceFor(hit.renewalCents / 100, s);
     const kes = first && P.toKes(first.priceCents, s);
-    if (!first || !renew || !kes) return send(res, 503, { error: 'No price is available for this domain right now.' });
+    if (!first || !renew || (!kes && !wallet)) return send(res, 503, { error: 'No price is available for this domain right now.' });
 
     return charge(sql, me, req, res, { siteId: site.id, kind: 'purchase', domain, costCents: hit.costCents, renewalCostCents: hit.renewalCents,
-        priceCents: first.priceCents, renewalPriceCents: renew.priceCents, kes, rate: rate.rate, phone, contact: parsed.contact });
+        priceCents: first.priceCents, renewalPriceCents: renew.priceCents, kes: kes || 0, rate: rate ? rate.rate : null, phone, contact: parsed.contact, wallet });
+}
+
+// Takes the price out of the operator's wallet in one safe step, then runs the same purchase as an M-Pesa order.
+async function payFromWallet(sql, me, res, order) {
+    const h = await W.hold(sql, me.id, order.id, order.price_usd_cents / 100);
+    if (!h.ok) {
+        await sql`UPDATE domain_orders SET status = 'cancelled', failure_reason = ${h.reason === 'busy' ? 'Another wallet payment was in progress' : 'Not enough in the wallet'}, updated_at = now() WHERE id = ${order.id} AND status = 'awaiting_payment'`;
+        return h.reason === 'busy'
+            ? send(res, 409, { error: 'Another wallet payment is still being processed. Please wait a moment.' })
+            : send(res, 402, { error: 'You do not have enough in your wallet for this. Pay by M-Pesa instead, or wait until more earnings are confirmed.' });
+    }
+    await sql`UPDATE domain_orders SET status = 'paid', paid_at = now(), updated_at = now() WHERE id = ${order.id} AND status = 'awaiting_payment'`;
+    await DO.fulfil(sql, order.id);
+    return send(res, 201, { order: DO.view(await DO.get(sql, order.id)) });
 }
 
 // Creates the order (one open order per name), sends the M-Pesa prompt, and answers the operator. Shared by buying and renewing.
@@ -105,14 +121,15 @@ async function charge(sql, me, req, res, o) {
     let order;
     try {
         order = (await sql`
-            INSERT INTO domain_orders (owner_id, site_id, kind, domain, years, price_usd_cents, price_kes, cost_usd_cents, renewal_usd_cents, renewal_cost_cents, fx_rate, phone, contact, expires_at)
-            VALUES (${me.id}, ${o.siteId}, ${o.kind}, ${o.domain}, 1, ${o.priceCents}, ${o.kes}, ${o.costCents}, ${o.renewalPriceCents || null}, ${o.renewalCostCents || null}, ${o.rate}, ${o.phone}, ${JSON.stringify(o.contact || {})}::jsonb,
-                    now() + (${DO.PAY_WINDOW_MINUTES} || ' minutes')::interval)
+            INSERT INTO domain_orders (owner_id, site_id, kind, domain, years, price_usd_cents, price_kes, cost_usd_cents, renewal_usd_cents, renewal_cost_cents, fx_rate, phone, contact, expires_at, pay_method)
+            VALUES (${me.id}, ${o.siteId}, ${o.kind}, ${o.domain}, 1, ${o.priceCents}, ${o.kes}, ${o.costCents}, ${o.renewalPriceCents || null}, ${o.renewalCostCents || null}, ${o.rate}, ${o.phone || ''}, ${JSON.stringify(o.contact || {})}::jsonb,
+                    now() + (${DO.PAY_WINDOW_MINUTES} || ' minutes')::interval, ${o.wallet ? 'wallet' : 'mpesa'})
             RETURNING *`)[0];
     } catch (err) {
         if (err && err.code === '23505') return send(res, 409, { error: 'Someone else is buying that domain right now. Try again in a few minutes.' });
         throw err;
     }
+    if (o.wallet) return payFromWallet(sql, me, res, order);
     const callbackUrl = `https://${A.requestHost(req)}/api/pay-callback?k=${encodeURIComponent(M.settings().callbackSecret)}`;
     const push = await M.stkPush({ phone: o.phone, amountKes: o.kes, reference: `EPM${order.id}`, description: o.kind === 'renewal' ? 'Renewal' : 'Domain', callbackUrl });
     if (!push.ok) {
@@ -151,16 +168,18 @@ async function renewalInfo(sql, me, res) {
 
 async function placeRenewal(sql, me, req, res, body) {
     if ((await A.hit(sql, `domainorder:owner:${me.id}`, 3600)) > 12) return send(res, 429, { error: 'Too many attempts. Please wait a while.' });
-    if (!M.isConfigured()) return send(res, 503, { error: 'Payments are not switched on yet. Please try again later.' });
-    const phone = M.normalizePhone(body.phone);
-    if (!phone) return send(res, 400, { error: 'Enter your Safaricom number, for example 0712345678.', fields: { phone: 'Enter a Safaricom number such as 0712345678.' } });
+    const wallet = body.pay === 'wallet';
+    if (!wallet && !M.isConfigured()) return send(res, 503, { error: 'Payments are not switched on yet. Please try again later.' });
+    const phone = wallet ? '' : M.normalizePhone(body.phone);
+    if (!wallet && !phone) return send(res, 400, { error: 'Enter your Safaricom number, for example 0712345678.', fields: { phone: 'Enter a Safaricom number such as 0712345678.' } });
     const q = await renewalQuote(sql, me);
     if (q.error) return send(res, q.code, { error: q.error });
-    if (!q.rate || !q.kes) return send(res, 503, { error: 'Prices in shillings are not available right now. Please try again later.' });
+    if (!q.price) return send(res, 503, { error: 'No price is available right now. Please try again later.' });
+    if (!wallet && (!q.rate || !q.kes)) return send(res, 503, { error: 'Prices in shillings are not available right now. Please try again later.' });
     if (q.days > RENEW_WINDOW_DAYS) return send(res, 409, { error: `You can renew in the last ${RENEW_WINDOW_DAYS} days before it expires.` });
     const busy = await sql`SELECT 1 FROM domain_orders WHERE site_id = ${q.site.id} AND kind = 'renewal' AND status IN ('paid', 'buying', 'check_needed') LIMIT 1`;
     if (busy.length) return send(res, 409, { error: 'A renewal for this domain is already being processed.' });
-    return charge(sql, me, req, res, { siteId: q.site.id, kind: 'renewal', domain: q.site.domain, costCents: q.costCents, priceCents: q.price.priceCents, kes: q.kes, rate: q.rate.rate, phone });
+    return charge(sql, me, req, res, { siteId: q.site.id, kind: 'renewal', domain: q.site.domain, costCents: q.costCents, priceCents: q.price.priceCents, kes: q.kes || 0, rate: q.rate ? q.rate.rate : null, phone, wallet });
 }
 
 module.exports = async function handler(req, res) {

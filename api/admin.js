@@ -7,6 +7,7 @@ const deriv = require('./_lib/deriv-apps');
 const DO = require('./_lib/domain-orders');
 const { provisionApp, syncAppToDeriv, reasonOf } = require('./_lib/site-app');
 const C = require('./_lib/commissions');
+const W = require('./_lib/wallet');
 const L = require('./_lib/library');
 const VD = require('./_lib/vercel-domains');
 
@@ -69,7 +70,7 @@ module.exports = async function handler(req, res) {
             library: () => L.adminView(sql),
             domain_orders: async () => {
                 const rows = await sql`
-                    SELECT d.id, d.kind, d.domain, d.status, d.price_kes, d.price_usd_cents, d.cost_usd_cents, d.mpesa_receipt, d.paid_kes, d.phone, d.failure_reason, d.refund_reference,
+                    SELECT d.id, d.kind, d.domain, d.status, d.price_kes, d.price_usd_cents, d.cost_usd_cents, d.mpesa_receipt, d.paid_kes, d.pay_method, d.phone, d.failure_reason, d.refund_reference,
                            d.vercel_order_id, d.attempts, d.created_at, d.paid_at, d.completed_at, o.email AS owner_email, o.name AS owner_name
                     FROM domain_orders d JOIN owners o ON o.id = d.owner_id
                     ORDER BY (d.status IN ('refund_due', 'check_needed', 'paid', 'buying')) DESC, d.id DESC LIMIT 60`;
@@ -110,11 +111,14 @@ module.exports = async function handler(req, res) {
         switch (body.action) {
             // ---- domain orders that need a person ----
             case 'order_refunded': {
-                const reference = String(body.reference || '').trim().slice(0, 100);
+                const wallet = (await sql`SELECT pay_method FROM domain_orders WHERE id = ${Number(body.id) || 0}`)[0];
+                const isWallet = !!wallet && wallet.pay_method === 'wallet';
+                const reference = isWallet ? 'Returned to wallet' : String(body.reference || '').trim().slice(0, 100);
                 if (reference.length < 3) return send(res, 400, { error: 'Enter the M-Pesa code you refunded with.' });
                 const r = await sql`UPDATE domain_orders SET status = 'refunded', refund_reference = ${reference}, updated_at = now()
                                     WHERE id = ${Number(body.id) || 0} AND status IN ('refund_due', 'check_needed') RETURNING id, owner_id, domain`;
                 if (!r.length) return send(res, 409, { error: 'That order is not waiting for a refund.' });
+                await W.settleOrder(sql, r[0].id);          // wallet orders: the money goes back into the operator's balance
                 await audit(sql, me.id, 'order_refunded', r[0].id, { domain: r[0].domain, reference });
                 return send(res, 200, { ok: true });
             }
@@ -132,6 +136,7 @@ module.exports = async function handler(req, res) {
                 if (!r.length) return send(res, 409, { error: 'That order is not waiting for a check.' });
                 const notes = r[0].kind === 'renewal' ? await DO.applyRenewal(sql, r[0]) : await DO.activatePurchase(sql, r[0]);
                 if (notes.length) await sql`UPDATE domain_orders SET failure_reason = ${notes.join(' ').slice(0, 300)} WHERE id = ${r[0].id}`;
+                await W.settleOrder(sql, r[0].id);
                 await audit(sql, me.id, 'order_complete', r[0].id, { domain: r[0].domain });
                 return send(res, 200, notes.length ? { ok: true, warning: notes.join(' ') } : { ok: true });
             }

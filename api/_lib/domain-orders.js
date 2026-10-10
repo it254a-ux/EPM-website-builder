@@ -9,6 +9,7 @@ const { logEvent } = require('./events');
 const { syncAppToDeriv, reasonOf } = require('./site-app');
 const S = require('./site-settings');
 const Reminders = require('./domain-reminders');
+const W = require('./wallet');
 
 const PAY_WINDOW_MINUTES = 10;
 
@@ -24,10 +25,20 @@ const MESSAGES = {
     refund_due: 'We could not complete this order. Your payment will be refunded to your M-Pesa.',
     refunded: 'This order was refunded to your M-Pesa.',
 };
+// Orders paid from the wallet say it in wallet words.
+const WALLET_MESSAGES = {
+    paid: 'Paid from your wallet. We are registering your domain now.',
+    buying: 'Paid from your wallet. We are registering your domain now.',
+    check_needed: 'Paid from your wallet. We are checking your registration and will confirm shortly.',
+    refund_due: 'We could not complete this order. The money is going back to your wallet.',
+    refunded: 'We could not complete this order. The money is back in your wallet.',
+    cancelled: 'This order was cancelled. Nothing was taken from your wallet.',
+};
 
 // What an operator may see about an order. Never the registrar's price or your profit.
 const view = o => ({
-    id: o.id, kind: o.kind, domain: o.domain, status: o.status, message: MESSAGES[o.status] || '',
+    id: o.id, kind: o.kind, domain: o.domain, status: o.status, pay_method: o.pay_method || 'mpesa',
+    message: (o.pay_method === 'wallet' && WALLET_MESSAGES[o.status]) || MESSAGES[o.status] || '',
     price_usd: o.price_usd_cents / 100, price_kes: o.price_kes,
     renewal_usd: o.renewal_usd_cents ? o.renewal_usd_cents / 100 : null,
     receipt: o.mpesa_receipt || null, created_at: o.created_at, completed_at: o.completed_at || null,
@@ -142,11 +153,13 @@ async function fulfil(sql, id) {
         if (r.kind === 'definite') await sql`UPDATE domain_orders SET status = 'refund_due', failure_reason = ${r.message}, updated_at = now() WHERE id = ${id}`;
         else if (r.kind === 'retry' && o.attempts < 5) await sql`UPDATE domain_orders SET status = 'paid', failure_reason = ${r.message}, updated_at = now() WHERE id = ${id}`;
         else await sql`UPDATE domain_orders SET status = 'check_needed', failure_reason = ${r.message}, updated_at = now() WHERE id = ${id}`;
+        await W.settleOrder(sql, id);
         return get(sql, id);
     }
     await sql`UPDATE domain_orders SET status = 'completed', vercel_order_id = ${r.orderId}, completed_at = now(), failure_reason = NULL, updated_at = now() WHERE id = ${id}`;
     const notes = o.kind === 'renewal' ? await applyRenewal(sql, o) : await activatePurchase(sql, o);
     if (notes.length) await note(sql, id, notes.join(' '));
+    await W.settleOrder(sql, id);
     return get(sql, id);
 }
 

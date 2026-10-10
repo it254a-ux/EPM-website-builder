@@ -154,7 +154,10 @@
                 if (!r || r.error) { holder.appendChild(el('p', { class: 'muted', text: 'Could not load domain orders.' })); return; }
                 var rows = (r.orders || []).map(function (o) {
                     var btns = el('div', { class: 'row' });
-                    if (o.status === 'refund_due' || o.status === 'check_needed') btns.appendChild(el('button', { text: 'Mark refunded', onclick: function () {
+                    var wallet = o.pay_method === 'wallet';
+                    if (wallet && (o.status === 'refund_due' || o.status === 'check_needed')) btns.appendChild(el('button', { text: 'Return to wallet', onclick: function () {
+                        if (confirm('Put $' + Number(o.price_usd).toFixed(2) + ' back into the operator\u2019s wallet? Only do this if ' + o.domain + ' was NOT registered.')) act({ action: 'order_refunded', id: o.id }); } }));
+                    else if (o.status === 'refund_due' || o.status === 'check_needed') btns.appendChild(el('button', { text: 'Mark refunded', onclick: function () {
                         var ref = prompt('Refund KES ' + o.paid_kes + ' to ' + o.phone + ' by M-Pesa, then enter the M-Pesa code:'); if (ref === null) return;
                         act({ action: 'order_refunded', id: o.id, reference: ref.trim() }); } }));
                     if (o.status === 'check_needed') btns.appendChild(el('button', { text: 'It is registered', onclick: function () {
@@ -163,7 +166,7 @@
                         if (confirm('Try to register ' + o.domain + ' again? If it is already registered, Vercel will refuse and nothing is charged twice.')) act({ action: 'order_retry', id: o.id }); } }));
                     var needs = ['refund_due', 'check_needed', 'paid', 'buying'].indexOf(o.status) >= 0;
                     return [new Date(o.created_at).toLocaleString(), (o.owner_name || '') + ' ' + (o.owner_email || ''), o.domain + (o.kind === 'renewal' ? ' (renewal)' : ''),
-                        'KES ' + (o.paid_kes || o.price_kes) + (o.mpesa_receipt ? ' · ' + o.mpesa_receipt : ''), '$' + Number(o.cost_usd).toFixed(2) + ' cost',
+                        wallet ? '$' + Number(o.price_usd).toFixed(2) + ' from wallet' : 'KES ' + (o.paid_kes || o.price_kes) + (o.mpesa_receipt ? ' · ' + o.mpesa_receipt : ''), '$' + Number(o.cost_usd).toFixed(2) + ' cost',
                         o.status === 'completed' ? '$' + Number(o.margin_usd).toFixed(2) : '—',
                         el('span', { class: needs ? 'pill bad' : 'pill', text: o.status }), (o.failure_reason || '') + (o.refund_reference ? ' Refund ' + o.refund_reference : ''), btns];
                 });

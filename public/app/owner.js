@@ -243,12 +243,16 @@
         return el('div', { class: 'notice ' + (r.paused || r.days_left <= 7 ? 'bad' : '') }, [el('div', { text: text }),
             el('button', { class: 'btn primary', type: 'button', text: 'Renew now', onclick: function () { S.domainTab = 'renew'; go('#/domains'); } })]);
     }
+    // The wallet is the operator's confirmed, unwithdrawn earnings (the same number as 'Available to withdraw').
+    function walletAvail() { return S.comm && S.comm.summary ? Number(S.comm.summary.available) || 0 : 0; }
+    function refreshWallet() { return api('/api/commissions'); }
     function moneyText(n) { return Number(n).toLocaleString('en-KE', { maximumFractionDigits: 0 }); }
     // Follows an order after the payment prompt is sent, until it is finished or we give up waiting.
     function watchOrder(id, tries, say, btn) {
         api('/api/domains?order=' + id).then(function (x) {
             var o = x && x.order;
             if (!o) { say('We could not check your payment. Please refresh the page in a minute.', 'bad'); return; }
+            if (o.pay_method === 'wallet') refreshWallet();
             if (o.status === 'completed') { say(o.message, 'ok'); toast(o.kind === 'renewal' ? 'Domain renewed' : 'Domain registered'); loadSite().then(function () { setTimeout(function () { S.domainTab = 'yours'; go('#/domains'); route(); }, 1500); }); return; }
             if (['cancelled', 'expired', 'refund_due', 'refunded', 'check_needed'].indexOf(o.status) >= 0) { say(o.message, o.status === 'check_needed' ? '' : 'bad'); btn.disabled = false; return; }
             say(o.message);
@@ -510,39 +514,47 @@
                 var price = r.kes_available && d.price_kes ? 'KES ' + money(d.price_kes) : null;
                 var renew = r.kes_available && d.renewal_kes ? 'KES ' + money(d.renewal_kes) : '$' + Number(d.renewal_usd).toFixed(2);
                 clear(out);
-                if (!price) { out.appendChild(el('div', { class: 'notice bad', text: 'Shilling prices are not available right now, so buying is paused. Please try again later.' })); return; }
+                var wb = walletAvail(), canWallet = wb >= Number(d.price_usd);
+                if (!price && !canWallet) { out.appendChild(el('div', { class: 'notice bad', text: 'Shilling prices are not available right now, so buying with M-Pesa is paused. Please try again later.' })); return; }
                 var f = { phone: field('phone', 'Your M-Pesa number', 'tel', '', 'The number that will get the payment prompt, for example 0712345678.'),
                     first_name: field('first_name', 'First name', 'text', ''), last_name: field('last_name', 'Last name', 'text', ''),
                     address1: field('address1', 'Street address', 'text', ''), city: field('city', 'Town or city', 'text', ''),
                     state: field('state', 'County or region', 'text', ''), zip: field('zip', 'Postal code', 'text', '', 'Use 00100 if you are not sure.'),
                     country: field('country', 'Country code', 'text', 'KE', 'Two letters, for example KE.') };
                 var msg = el('div', { class: 'notice', style: 'display:none' });
-                var payBtn = el('button', { class: 'btn primary', type: 'button', text: 'Pay ' + price + ' with M-Pesa' });
+                var payBtn = price ? el('button', { class: 'btn primary', type: 'button', text: 'Pay ' + price + ' with M-Pesa' }) : null;
+                var walletBtn = canWallet ? el('button', { class: 'btn' + (price ? '' : ' primary'), type: 'button', text: 'Pay $' + Number(d.price_usd).toFixed(2) + ' from wallet' }) : null;
                 var back = el('button', { class: 'btn', type: 'button', text: 'Back', onclick: search });
                 var box = el('div', { class: 'card', style: 'margin-top:8px' }, [
                     el('h3', { text: d.domain }),
                     el('p', {}, [el('strong', { text: price }), ' for the first year. It renews at ', el('strong', { text: renew }), ' a year after that. We do not renew it for you: you will be reminded, and your site pauses if you do not renew.']),
                     el('p', { class: 'muted small', text: 'The registry needs the owner\u2019s details. Use your real details.' }),
                     f.first_name.wrap, f.last_name.wrap, f.address1.wrap, f.city.wrap, f.state.wrap, f.zip.wrap, f.country.wrap, f.phone.wrap, msg,
-                    el('div', { class: 'row' }, [payBtn, back])]);
+                    el('p', { class: 'muted small', text: 'Wallet balance: ' + usd(wb) + (canWallet ? '. You can pay from it without M-Pesa.' : '. That is not enough for this domain, so pay by M-Pesa.') }),
+                    el('div', { class: 'row' }, [payBtn, walletBtn, back].filter(Boolean))]);
                 out.appendChild(box);
                 function say(text, kind) { msg.style.display = text ? '' : 'none'; msg.className = 'notice ' + (kind || ''); msg.textContent = text || ''; }
-                payBtn.addEventListener('click', function () {
+                function submit(pay, btn) {
                     Object.keys(f).forEach(function (k) { f[k].setError(''); });
                     var body = { action: 'order', domain: d.domain, phone: f.phone.input.value, contact: {} };
+                    if (pay === 'wallet') body.pay = 'wallet';
                     ['first_name', 'last_name', 'address1', 'city', 'state', 'zip', 'country'].forEach(function (k) { body.contact[k] = f[k].input.value; });
-                    payBtn.disabled = true; say('Sending the payment prompt to your phone\u2026');
+                    [payBtn, walletBtn].forEach(function (b) { if (b) b.disabled = true; });
+                    say(pay === 'wallet' ? 'Paying from your wallet\u2026' : 'Sending the payment prompt to your phone\u2026');
                     api('/api/domains', 'POST', body).then(function (x) {
+                        function again() { [payBtn, walletBtn].forEach(function (b) { if (b) b.disabled = false; }); }
                         if (!x || !x.order) {
-                            payBtn.disabled = false;
+                            again();
                             var fl = (x && x.fields) || {};
                             Object.keys(fl).forEach(function (k) { if (f[k]) f[k].setError(fl[k]); });
                             say((x && x.error) || 'Something went wrong. Please try again.', 'bad'); return;
                         }
                         say(x.order.message);
-                        watchOrder(x.order.id, 45, say, payBtn);
+                        watchOrder(x.order.id, 45, say, { set disabled(v) { if (!v) again(); } });
                     });
-                });
+                }
+                if (payBtn) payBtn.addEventListener('click', function () { submit('mpesa'); });
+                if (walletBtn) walletBtn.addEventListener('click', function () { submit('wallet'); });
             }
             function search() {
                 var name = String(q.value || '').trim().toLowerCase().replace(/^https?:\/\//, '').replace(/\/.*$/, '').replace(/^www\./, '');
@@ -608,21 +620,30 @@
                 var date = new Date(r.expires_at).toLocaleDateString('en-KE', { day: 'numeric', month: 'long', year: 'numeric' });
                 rbox.appendChild(el('p', {}, [el('strong', { text: r.domain }), r.paused ? ' expired on ' + date + '. Your site is paused until you renew.' : ' expires on ' + date + '.']));
                 if (!r.can_renew) { rbox.appendChild(el('p', { class: 'muted', text: 'You can renew in the last 90 days before it expires. We will remind you here.' })); return; }
-                if (!r.kes_available) { rbox.appendChild(el('div', { class: 'notice bad', text: 'Shilling prices are not available right now, so renewing is paused. Please try again later.' })); return; }
+                var wbal = walletAvail(), rWallet = wbal >= Number(r.price_usd);
+                if (!r.kes_available && !rWallet) { rbox.appendChild(el('div', { class: 'notice bad', text: 'Shilling prices are not available right now, so renewing with M-Pesa is paused. Please try again later.' })); return; }
                 var phone = field('phone', 'Your M-Pesa number', 'tel', '', 'The number that will get the payment prompt, for example 0712345678.');
                 var rmsg = el('div', { class: 'notice', style: 'display:none' });
-                var pay = el('button', { class: 'btn primary', type: 'button', text: 'Pay KES ' + moneyText(r.price_kes) + ' with M-Pesa' });
+                var pay = r.kes_available ? el('button', { class: 'btn primary', type: 'button', text: 'Pay KES ' + moneyText(r.price_kes) + ' with M-Pesa' }) : null;
+                var wpay = rWallet ? el('button', { class: 'btn' + (r.kes_available ? '' : ' primary'), type: 'button', text: 'Pay $' + Number(r.price_usd).toFixed(2) + ' from wallet' }) : null;
                 function say2(text, kind) { rmsg.style.display = text ? '' : 'none'; rmsg.className = 'notice ' + (kind || ''); rmsg.textContent = text || ''; }
-                pay.addEventListener('click', function () {
-                    phone.setError(''); pay.disabled = true; say2('Sending the payment prompt to your phone\u2026');
-                    api('/api/domains', 'POST', { action: 'renew', phone: phone.input.value }).then(function (x) {
-                        if (!x || !x.order) { pay.disabled = false; if (x && x.fields && x.fields.phone) phone.setError(x.fields.phone); say2((x && x.error) || 'Something went wrong. Please try again.', 'bad'); return; }
-                        say2(x.order.message); watchOrder(x.order.id, 45, say2, pay);
+                function renew(how) {
+                    phone.setError(''); [pay, wpay].forEach(function (b) { if (b) b.disabled = true; });
+                    say2(how === 'wallet' ? 'Paying from your wallet\u2026' : 'Sending the payment prompt to your phone\u2026');
+                    var body = { action: 'renew' }; if (how === 'wallet') body.pay = 'wallet'; else body.phone = phone.input.value;
+                    api('/api/domains', 'POST', body).then(function (x) {
+                        function again() { [pay, wpay].forEach(function (b) { if (b) b.disabled = false; }); }
+                        if (!x || !x.order) { again(); if (x && x.fields && x.fields.phone) phone.setError(x.fields.phone); say2((x && x.error) || 'Something went wrong. Please try again.', 'bad'); return; }
+                        say2(x.order.message); watchOrder(x.order.id, 45, say2, { set disabled(v) { if (!v) again(); } });
                     });
-                });
-                rbox.appendChild(el('p', {}, [el('strong', { text: 'KES ' + moneyText(r.price_kes) }), ' for one more year.']));
-                rbox.appendChild(phone.wrap); rbox.appendChild(rmsg); rbox.appendChild(el('div', { class: 'row' }, [pay]));
-                if (r.rate_credit) rbox.appendChild(el('p', { class: 'muted small' }, ['Rates By ', el('a', { href: 'https://www.exchangerate-api.com', target: '_blank', rel: 'noopener noreferrer', text: 'Exchange Rate API' }), '.']));
+                }
+                if (pay) pay.addEventListener('click', function () { renew('mpesa'); });
+                if (wpay) wpay.addEventListener('click', function () { renew('wallet'); });
+                rbox.appendChild(el('p', {}, [el('strong', { text: r.kes_available ? 'KES ' + moneyText(r.price_kes) : usd(r.price_usd) }), ' for one more year.']));
+                if (r.kes_available) rbox.appendChild(phone.wrap);
+                rbox.appendChild(rmsg);
+                rbox.appendChild(el('p', { class: 'muted small', text: 'Wallet balance: ' + usd(wbal) + (rWallet ? '. You can pay from it without M-Pesa.' : '.') }));
+                rbox.appendChild(el('div', { class: 'row' }, [pay, wpay].filter(Boolean)));
             });
         }
         return v;
@@ -672,6 +693,8 @@
             statBox('This month (' + monthName(s.this_month_label) + ')', usd(s.this_month)),
             statBox(s.latest_day ? 'Latest day (' + dayName(s.latest_day) + ')' : 'Latest day', usd(s.latest_day_amount)),
             statBox('Withdrawal requested', usd(s.requested))]));
+        if (s.spent > 0) body.appendChild(el('div', { class: 'stats' }, [statBox('Spent on domains', usd(s.spent))]));
+        body.appendChild(el('p', { class: 'muted small', text: 'Your wallet is the amount available to withdraw. You can also use it to buy or renew a domain, without M-Pesa.' }));
         var card = el('div', { class: 'card' }, [el('h2', { text: 'How your earnings work' }),
             el('p', { class: 'muted', text: 'Your earnings come from your clients’ trading on your site and are updated once a day. A month’s earnings stay under "Awaiting Deriv payment" until Deriv has paid that month and we have confirmed it. Then they move to "Available to withdraw".' }),
             el('p', { class: 'muted small', text: s.last_updated ? 'Last updated ' + fmtDate(s.last_updated) + '.' : 'No earnings have been recorded yet.' }),
@@ -680,6 +703,14 @@
     }
 
     function commHistory(body, d) {
+        var wl = el('div', { class: 'card' }, [el('h2', { text: 'Wallet activity' }),
+            el('p', { class: 'muted small', text: 'Everything that moved your balance: confirmed earnings, withdrawals, and domains paid from your wallet. Wallet balance: ' + usd(d.summary.available) + '.' })]);
+        if (!d.wallet || !d.wallet.length) wl.appendChild(el('p', { class: 'muted', text: 'Nothing yet. Confirmed earnings, withdrawals and domain payments will be listed here.' }));
+        else wl.appendChild(simpleTable(['Date', 'What', 'Amount', 'Status'], d.wallet.map(function (w) {
+            var st = { done: ['Done', 'active'], waiting: ['In progress', 'pending'], returned: ['Returned', 'suspended'] }[w.status] || ['', ''];
+            return [fmtDate(w.at), w.label, (w.amount < 0 ? '\u2212' : '+') + usd(Math.abs(w.amount)), pill(st[0], st[1])];
+        })));
+        body.appendChild(wl);
         var months = el('div', { class: 'card' }, [el('h2', { text: 'By month' })]);
         if (!d.months.length) months.appendChild(el('p', { class: 'muted', text: 'Nothing recorded yet. Your months will be listed here.' }));
         else months.appendChild(simpleTable(['Month', 'Earned', 'Status'], d.months.map(function (m) {

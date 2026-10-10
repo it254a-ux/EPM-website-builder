@@ -267,3 +267,22 @@ CREATE TABLE IF NOT EXISTS domain_reminders (
     sent_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
     UNIQUE (site_id, level, expires_on)
 );
+
+-- ===== Step 5: wallet =====
+-- An operator's wallet is their confirmed, unwithdrawn earnings. Paying for a domain from it writes one row here.
+--   held     = taken from the balance while the order is being processed
+--   spent    = the domain was registered
+--   refunded = the order failed, the money is back in the balance
+ALTER TABLE domain_orders ADD COLUMN IF NOT EXISTS pay_method TEXT NOT NULL DEFAULT 'mpesa';   -- mpesa | wallet
+CREATE TABLE IF NOT EXISTS wallet_debits (
+    id         SERIAL PRIMARY KEY,
+    owner_id   INTEGER NOT NULL REFERENCES owners(id) ON DELETE CASCADE,
+    order_id   INTEGER NOT NULL UNIQUE REFERENCES domain_orders(id) ON DELETE CASCADE,
+    amount_usd NUMERIC(12,2) NOT NULL CHECK (amount_usd > 0),
+    status     TEXT NOT NULL DEFAULT 'held' CHECK (status IN ('held', 'spent', 'refunded')),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS wallet_debits_owner_idx ON wallet_debits (owner_id, id DESC);
+-- One wallet payment in flight per operator at a time (same idea as the single open withdrawal).
+CREATE UNIQUE INDEX IF NOT EXISTS wallet_one_held_idx ON wallet_debits (owner_id) WHERE status = 'held';
