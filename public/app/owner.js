@@ -309,6 +309,7 @@
         sites: { title: 'Market watch', seed: 7, tiles: [['Volatility 100', 11, 1.1], ['Volatility 50', 27, 0.5], ['Boom 1000', 42, 1.6], ['Crash 1000', 58, -1.4]] },
         bots: { title: 'Popular markets', seed: 19, tiles: [['Volatility 75', 5, 1.2], ['Volatility 25', 19, -0.6], ['Step Index', 33, 0.9], ['Jump 100', 64, -1.1]] },
         pulse: { title: 'Market pulse', seed: 31, tiles: [['Volatility 10', 8, 0.7], ['Boom 500', 21, 1.4], ['Crash 500', 37, -1.2], ['Range Break 100', 71, 0.4]] },
+        domains: { title: 'Markets to watch', seed: 53, tiles: [['Volatility 75 (1s)', 9, 1.3], ['Boom 100', 24, 1.0], ['Crash 100', 39, -0.8], ['Jump 50', 66, 0.6]] },
         earn: { title: 'Market activity', seed: 43, tiles: [['Volatility 100 (1s)', 13, 1.0], ['Boom 300', 29, 1.5], ['Crash 300', 46, -1.0], ['Volatility 50 (1s)', 52, 0.3]] },
     };
     function marketStrip(kind) {
@@ -319,8 +320,7 @@
         }));
         return el('div', { class: 'card mkt', role: 'img', 'aria-label': 'Illustrative market charts, not live prices' }, [
             el('div', { class: 'mkt-head' }, [el('h2', { text: set.title }), el('span', { class: 'mkt-tag', text: 'Illustrative \u00b7 not live prices' })]),
-            grid, el('div', { class: 'mkt-candles' }, [candleSvg(set.seed)]),
-            el('p', { class: 'muted small', style: 'margin:8px 0 0', text: 'Sample charts for illustration only. They are not real prices and not trading advice.' })]);
+            grid, el('div', { class: 'mkt-candles' }, [candleSvg(set.seed)])]);
     }
 
     function sitesView() {
@@ -328,7 +328,7 @@
         v.appendChild(el('div', { class: 'row between' }, [head('Welcome ' + S.owner.name.split(' ')[0], 'Your sites'),
             site ? null : el('a', { class: 'btn primary', href: '#/sites/new', text: 'Create new site' })]));
         v.appendChild(supportBanner());
-        v.appendChild(renewalBanner());
+        var rb = renewalBanner(); if (rb) v.appendChild(rb);
         if (!site) {
             v.appendChild(el('div', { class: 'card empty' }, [el('div', { class: 'bubble' }, [svg(ICON.store)]),
                 el('h2', {}, ['No sites yet.', el('span', { text: 'Let\u2019s build your first one!' })]),
@@ -460,14 +460,14 @@
     function domainsView() {
         var v = el('div'), site = S.site;
         v.appendChild(head('Infrastructure', 'Domains', 'Your platform address, your own domains, and buying a new one.'));
-        if (!site) { v.appendChild(el('div', { class: 'card' }, [el('p', { text: 'Create a site first, then you can connect or buy a domain.' }), el('a', { class: 'btn primary', href: '#/sites/new', text: 'Create site' })])); return v; }
+        if (!site) { v.appendChild(el('div', { class: 'card' }, [el('p', { text: 'Create a site first, then you can connect or buy a domain.' }), el('a', { class: 'btn primary', href: '#/sites/new', text: 'Create site' })])); v.appendChild(marketStrip('domains')); return v; }
 
         var TABS = [['yours', 'Your address'], ['buy', 'Buy a domain'], ['own', 'Connect your own'], ['history', 'Payment history']];
         if (site.renewal) TABS.splice(1, 0, ['renew', 'Renew']);
         if (cur0() === 'renew' && !site.renewal) S.domainTab = 'yours';
         var cur = S.domainTab || 'yours';
         function cur0() { return S.domainTab; }
-        v.appendChild(renewalBanner());
+        var rb = renewalBanner(); if (rb) v.appendChild(rb);
         var tabBar = el('div', { class: 'tabs', role: 'tablist' }, TABS.map(function (t) {
             return el('button', { type: 'button', role: 'tab', class: 'tab' + (t[0] === cur ? ' on' : ''), 'aria-selected': t[0] === cur ? 'true' : 'false', text: t[1],
                 onclick: function () { S.domainTab = t[0]; route(); } });
