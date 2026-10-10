@@ -4,6 +4,8 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const path = require('path');
 const vm = require('vm');
+// The worker's current cache name, read from the file so a version bump never breaks this test.
+const CURRENT_CACHE = require('fs').readFileSync(require('path').join(__dirname, '../../public/app/sw.js'), 'utf8').match(/const CACHE = '([^']+)'/)[1];
 
 function load() {
     const store = new Map(), handlers = {}, messages = [], network = [];
@@ -17,7 +19,7 @@ function load() {
     };
     const ctx = {
         self, URL, Promise,
-        caches: { open: async () => cache, keys: async () => ['old-cache', 'epm-app-v2'], delete: async k => { store.set('deleted:' + k, true); } },
+        caches: { open: async () => cache, keys: async () => ['old-cache', CURRENT_CACHE], delete: async k => { store.set('deleted:' + k, true); } },
         fetch: async (r, o) => { if (down) throw new Error('offline'); const url = typeof r === 'string' ? new URL(r, 'https://b.test').href : r.url; network.push(url); return mkResponse(url, 'body-' + version, 'e-' + version); },
     };
     vm.createContext(ctx);
@@ -82,5 +84,5 @@ test('old stored copies are cleared when a new version takes over', async () => 
     const sw = load();
     await new Promise(r => sw.handlers.activate({ waitUntil: p => p.then(r) }));
     assert.ok(sw.store.get('deleted:old-cache'));
-    assert.ok(!sw.store.get('deleted:epm-app-v2'));
+    assert.ok(!sw.store.get('deleted:' + CURRENT_CACHE), 'the current version is kept');
 });
