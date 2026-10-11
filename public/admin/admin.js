@@ -34,6 +34,8 @@
         return el('div', { class: 'scroll' }, [t]);
     }
 
+    function money(n) { return '$' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
+
     function render(sites, owners, pool, dv, cm, lb) {
         clear();
         app.appendChild(el('div', { class: 'row', style: 'justify-content:space-between' }, [
@@ -86,7 +88,7 @@
                 if (v === null) return; act({ action: 'set_rate', site_id: s.id, platform_share: v.trim() === '' ? null : Number(v) }); } }));
             btns.appendChild(el('button', { text: 'Delete', onclick: function () {
                 if (confirm('Permanently delete the site "' + s.name + '" (' + s.domain + ')? This cannot be undone.')) act({ action: 'delete_site', site_id: s.id }); } }));
-            return [s.name, s.domain, s.plan, el('span', { class: 'pill', text: s.status }), s.platform_share + '%', (s.markup_pending ? el('span', { class: 'pill', text: Number(s.markup_percent) + '% \u00b7 update on Deriv' }) : Number(s.markup_percent) + '%'), s.app_id ? (s.app_source === 'api' ? s.app_id + ' \u00b7 auto' : s.app_id) : el('span', { class: 'pill', text: 'awaiting App ID' }), s.owner_email || '', btns];
+            return [s.name, s.domain, s.plan, el('span', { class: 'pill', text: s.status }), s.platform_share + '%', (s.markup_pending ? el('span', { class: 'pill', text: Number(s.markup_percent) + '% \u00b7 update on Deriv' }) : Number(s.markup_percent) + '%'), s.app_id ? (s.app_source === 'api' ? s.app_id + ' \u00b7 auto' : s.app_id) : el('span', { class: 'pill', text: 'awaiting App ID' }), s.app_id ? money(s.earned_total) : '\u2014', s.app_id ? money(s.earned_month) : '\u2014', s.owner_email || '', btns];
         });
         // ----- Deriv connection -----
         var dvMsg = el('div', { class: 'muted' });
@@ -98,7 +100,7 @@
                 dvMsg.textContent = r.error ? r.error : 'Connected to Deriv with the Admin scope' + (r.loginid ? ' (account ' + r.loginid + ')' : '') + (r.missing && r.missing.length ? '. Still missing: ' + r.missing.join(', ') + '.' : '. Ready.'); }); } });
         if (dv.enabled) app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Deriv connection' }), el('p', { class: 'muted', text: dvText }), el('div', { class: 'row' }, [testBtn, dvMsg])]));
 
-        app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Sites' }), table(['Name', 'Domain', 'Plan', 'Status', 'You keep', 'Markup', 'App ID', 'Owner', 'Actions'], siteRows)]));
+        app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Sites' }), table(['Name', 'Domain', 'Plan', 'Status', 'You keep', 'Markup', 'App ID', 'Earned (all time)', 'Earned (this month)', 'Owner', 'Actions'], siteRows)]));
 
         // ----- Commissions -----
         (function () {

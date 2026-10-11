@@ -49,11 +49,13 @@ module.exports = async function handler(req, res) {
                                SELECT 1 FROM site_events e WHERE e.site_id = s.id AND e.event = 'markup_changed'
                                  AND e.id > COALESCE((SELECT max(x.id) FROM site_events x WHERE x.site_id = s.id AND x.event IN ('app_id_assigned', 'markup_confirmed')), 0)
                            )) AS markup_pending,
+                           (SELECT COALESCE(SUM(c.markup_usd), 0) FROM commission_daily c WHERE c.app_id = s.app_id) AS earned_total,
+                           (SELECT COALESCE(SUM(c.markup_usd), 0) FROM commission_daily c WHERE c.app_id = s.app_id AND to_char(c.day, 'YYYY-MM') = to_char(now() AT TIME ZONE 'UTC', 'YYYY-MM')) AS earned_month,
                            s.created_at, o.email AS owner_email, o.name AS owner_name
                     FROM sites s LEFT JOIN owners o ON o.id = s.owner_id
                     ORDER BY s.created_at DESC LIMIT 500
                 `;
-                return { sites: rows.map(r => ({ ...r, platform_share: effectiveShare(r) })) };
+                return { sites: rows.map(r => ({ ...r, platform_share: effectiveShare(r), earned_total: Math.round(Number(r.earned_total || 0) * 100) / 100, earned_month: Math.round(Number(r.earned_month || 0) * 100) / 100 })) };
             },
             pool: async () => {
                 const [tiers, apps] = await Promise.all([sql`
