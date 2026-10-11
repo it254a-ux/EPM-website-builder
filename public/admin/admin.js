@@ -272,6 +272,17 @@
             return [o.email, o.name, o.role, o.disabled ? 'disabled' : 'active', b];
         });
         app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Accounts' }), table(['Email', 'Name', 'Role', 'State', ''], ownerRows)]));
+
+        // Jump-to-section chips under the top bar (display only; links to the cards above)
+        var nav = el('div', { class: 'admin-nav' });
+        var n = 0;
+        Array.prototype.forEach.call(app.querySelectorAll(':scope > .card'), function (card) {
+            var h = card.firstChild;
+            if (!h || h.tagName !== 'H2') return;
+            card.id = 'sec-' + (++n);
+            nav.appendChild(el('a', { href: '#sec-' + n, text: h.textContent.replace(/\s*\(.*\)\s*$/, '') }));
+        });
+        if (n > 2 && app.firstChild) app.insertBefore(nav, app.firstChild.nextSibling);
     }
 
     // One request brings every list (the server reads them at the same time). Falls back to separate requests if it is not there yet.

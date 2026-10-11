@@ -1,0 +1,57 @@
+/* Admin page layout only. Loaded after /panel.css and ONLY by /admin, so the operator
+   pages that share panel.css are not affected. No behaviour lives here. */
+main{max-width:1240px;padding:12px 18px 40px}
+h1{font-size:1.15rem;margin:2px 0 10px;letter-spacing:.2px}
+
+/* top bar: counts + sign out */
+#app>.row:first-child{position:sticky;top:0;z-index:5;margin:0 -18px 10px;padding:8px 18px;background:var(--bg);border-bottom:1px solid var(--line);font-size:.85rem}
+#app>.row:first-child button{padding:4px 12px}
+
+/* jump-to-section chips (added by admin.js) */
+.admin-nav{display:flex;flex-wrap:wrap;gap:6px;margin:0 0 12px}
+.admin-nav a{padding:3px 11px;border:1px solid var(--line);border-radius:99px;background:var(--card);color:var(--text);font-size:.78rem;text-decoration:none}
+.admin-nav a:hover{border-color:var(--brand);color:var(--brand)}
+
+/* cards */
+.card{padding:12px 14px;margin-bottom:12px;border-radius:10px;box-shadow:0 1px 2px rgba(0,0,0,.05);scroll-margin-top:56px}
+.card h2{font-size:.95rem;margin:0 0 6px;display:flex;align-items:center;gap:8px}
+.card h2[style]{margin-top:12px!important}
+.card>p{margin:0 0 8px}
+.card>p.muted{font-size:.82rem;line-height:1.45;max-width:110ch}
+.card>p.err{margin:0 0 4px}
+div[style^="height"]{height:6px!important}
+
+/* tables */
+.scroll{margin:0 -4px}
+table{font-size:.82rem}
+th{padding:6px 8px;font-size:.7rem;font-weight:600;text-transform:uppercase;letter-spacing:.4px;color:var(--muted);background:rgba(127,127,127,.07);white-space:nowrap}
+td{padding:6px 8px;vertical-align:middle;overflow-wrap:break-word}
+td:nth-child(2){min-width:12ch}
+tr:last-child td{border-bottom:0}
+tbody tr:hover td,table tr:hover td{background:rgba(127,127,127,.05)}
+td .muted{font-size:.78rem}
+
+/* buttons, inputs */
+button{padding:5px 10px;font-size:.8rem;border-radius:6px;white-space:nowrap}
+button:hover:not(:disabled){border-color:var(--brand)}
+td .row,.row{gap:5px}
+input,select,textarea{padding:6px 9px;font-size:.85rem;border-radius:6px}
+.card input[type=date]{width:auto}
+.card select{width:auto;min-width:180px}
+.card textarea{min-height:60px;max-width:680px}
+.card>input,.card>select{max-width:420px}
+.card .row{margin-top:4px}
+
+/* pills */
+.pill{padding:1px 8px;font-size:.74rem;white-space:nowrap}
+.pill.bad{color:var(--bad);border-color:var(--bad)}
+
+/* sign-in card */
+#app>.card:only-child{max-width:380px;margin:40px auto}
+#app>.card:only-child input{margin-bottom:0}
+
+@media (max-width:640px){
+  main{padding:8px 10px 30px}
+  #app>.row:first-child{margin:0 -10px 8px;padding:6px 10px}
+  .card{padding:10px}
+}
