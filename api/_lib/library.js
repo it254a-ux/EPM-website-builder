@@ -7,6 +7,7 @@ const LIMITS = {
     strategyTitle: 120, strategyDescription: 2000, strategiesPerSite: 50,
     fileBytes: 3 * 1024 * 1024,           // a JSON upload must stay under Vercel's 4.5 MB request limit, and base64 adds a third
     requestTitle: 120, requestDetails: 2000, openRequests: 5,
+    designBusiness: 120, designDetails: 3000, designShort: 300, openDesigns: 3,
     note: 500,
 };
 const CONTRACT_TYPES = ['Accumulators', 'Rise/Fall', 'Matches/Differs', 'Over/Under', 'Even/Odd', 'Multiplier', 'Other'];
@@ -111,22 +112,37 @@ const strategyView = r => ({
     id: r.id, title: r.title, description: r.description, file_name: r.file_name, size_bytes: r.size_bytes,
     url: r.status === 'live' ? r.blob_url : '', status: r.status, removed_note: r.removed_note || '', created_at: r.created_at,
 });
+const DESIGN_KINDS = ['Trading website', 'Landing page', 'Logo and branding', 'Redesign of my site', 'Something else'];
+const designView = r => ({ id: r.id, business_name: r.business_name, kind: r.kind, details: r.details, colors: r.colors || '', links: r.links || '', contact: r.contact,
+    status: r.status, admin_note: r.admin_note || '', created_at: r.created_at, decided_at: r.decided_at });
+// -> { value } or { error, field }
+function validateDesign(body, fallbackEmail) {
+    const business = clean(body.business_name, LIMITS.designBusiness);
+    if (!business) return { error: 'Enter your business or brand name.', field: 'business_name' };
+    const kind = DESIGN_KINDS.includes(body.kind) ? body.kind : '';
+    if (!kind) return { error: 'Choose what you need.', field: 'kind' };
+    const details = clean(body.details, LIMITS.designDetails);
+    if (details.length < 20) return { error: 'Tell us a bit more (at least a couple of sentences) so we can quote properly.', field: 'details' };
+    const contact = clean(body.contact, LIMITS.designShort) || fallbackEmail;
+    return { value: { business_name: business, kind, details, colors: clean(body.colors, LIMITS.designShort), links: clean(body.links, LIMITS.designShort), contact } };
+}
 const requestView = r => ({ id: r.id, title: r.title, details: r.details, status: r.status, admin_note: r.admin_note || '', created_at: r.created_at, decided_at: r.decided_at });
 
 async function operatorView(sql, ownerId) {
     // Everything is read at the same time.
-    const [site, requests] = await Promise.all([
+    const [site, requests, designs] = await Promise.all([
         sql`SELECT id, name, domain, status FROM sites WHERE owner_id = ${ownerId} LIMIT 1`.then(r => r[0] || null),
         sql`SELECT id, title, details, status, admin_note, created_at, decided_at FROM site_bot_requests WHERE owner_id = ${ownerId} ORDER BY id DESC LIMIT 50`,
+        sql`SELECT * FROM design_requests WHERE owner_id = ${ownerId} ORDER BY id DESC LIMIT 20`,
     ]);
-    if (!site) return { site: null, bots: [], strategies: [], requests: requests.map(requestView), limits: publicLimits(), storage_ready: storageReady() };
+    if (!site) return { site: null, bots: [], strategies: [], requests: requests.map(requestView), designs: designs.map(designView), design_kinds: DESIGN_KINDS, limits: publicLimits(), storage_ready: storageReady() };
     const [bots, strategies] = await Promise.all([
         sql`SELECT id, name, description, market, risk_level, contract_type, status, removed_note, created_at FROM site_bots WHERE site_id = ${site.id} ORDER BY id DESC`,
         sql`SELECT id, title, description, file_name, size_bytes, blob_url, status, removed_note, created_at FROM site_strategies WHERE site_id = ${site.id} ORDER BY id DESC`,
     ]);
     return {
         site: { id: site.id, name: site.name, domain: site.domain },
-        bots: bots.map(botView), strategies: strategies.map(strategyView), requests: requests.map(requestView),
+        bots: bots.map(botView), strategies: strategies.map(strategyView), requests: requests.map(requestView), designs: designs.map(designView), design_kinds: DESIGN_KINDS,
         limits: publicLimits(), storage_ready: storageReady(),
     };
 }
@@ -152,7 +168,7 @@ async function publicBot(sql, host, id) {
 }
 
 async function adminView(sql) {
-    const [bots, strategies, requests] = await Promise.all([sql`
+    const [bots, strategies, requests, designs] = await Promise.all([sql`
         SELECT b.id, b.name, b.market, b.risk_level, b.status, b.removed_note, b.created_at, s.domain AS site_domain, o.email AS owner_email
         FROM site_bots b JOIN sites s ON s.id = b.site_id JOIN owners o ON o.id = b.owner_id ORDER BY b.id DESC LIMIT 200`,
     sql`
@@ -160,12 +176,16 @@ async function adminView(sql) {
         FROM site_strategies t JOIN sites s ON s.id = t.site_id JOIN owners o ON o.id = t.owner_id ORDER BY t.id DESC LIMIT 200`,
     sql`
         SELECT r.id, r.title, r.details, r.status, r.admin_note, r.created_at, o.email AS owner_email, s.domain AS site_domain
-        FROM site_bot_requests r JOIN owners o ON o.id = r.owner_id LEFT JOIN sites s ON s.id = r.site_id ORDER BY (r.status = 'open') DESC, r.id DESC LIMIT 200`]);
-    return { bots, strategies, requests, storage_ready: storageReady() };
+        FROM site_bot_requests r JOIN owners o ON o.id = r.owner_id LEFT JOIN sites s ON s.id = r.site_id ORDER BY (r.status = 'open') DESC, r.id DESC LIMIT 200`,
+    sql`
+        SELECT d.*, o.email AS owner_email, o.name AS owner_name, s.domain AS site_domain
+        FROM design_requests d JOIN owners o ON o.id = d.owner_id LEFT JOIN sites s ON s.id = d.site_id
+        ORDER BY (d.status IN ('open', 'in_progress')) DESC, d.id DESC LIMIT 200`]);
+    return { bots, strategies, requests, designs, storage_ready: storageReady() };
 }
 
 module.exports = {
-    LIMITS, CONTRACT_TYPES, RISK_LEVELS, FILE_TYPES, clean,
+    LIMITS, CONTRACT_TYPES, RISK_LEVELS, FILE_TYPES, DESIGN_KINDS, clean, validateDesign,
     validateBot, checkBotXml, validateStrategy,
     setBlob, storageReady, storeFile, purgeFiles, fileUrlsForSite, fileUrlsForOwner,
     operatorView, publicLibrary, publicBot, adminView,

@@ -122,6 +122,27 @@ module.exports = async function handler(req, res) {
                 return send(res, 200, await L.operatorView(sql, me.id));
             }
 
+            case 'request_design': {
+                if ((await A.hit(sql, `lib:design:${me.id}`, 3600)) > 6) return send(res, 429, { error: 'Too many requests. Please try again later.' });
+                const v = L.validateDesign(body, me.email);
+                if (!v.value) return fail(res, v);
+                const d = v.value;
+                const r = await sql`
+                    INSERT INTO design_requests (owner_id, site_id, business_name, kind, details, colors, links, contact)
+                    SELECT ${me.id}, ${site ? site.id : null}, ${d.business_name}, ${d.kind}, ${d.details}, ${d.colors || null}, ${d.links || null}, ${d.contact}
+                    WHERE (SELECT count(*) FROM design_requests WHERE owner_id = ${me.id} AND status IN ('open', 'in_progress')) < ${L.LIMITS.openDesigns}
+                    RETURNING id`;
+                if (!r.length) return send(res, 400, { error: `You already have ${L.LIMITS.openDesigns} design requests in progress. Please wait for answers first.` });
+                await audit(sql, me.id, 'design_requested', r[0].id, { kind: d.kind });
+                return send(res, 201, await L.operatorView(sql, me.id));
+            }
+
+            case 'cancel_design': {
+                const r = await sql`UPDATE design_requests SET status = 'cancelled', decided_at = now() WHERE id = ${Number(body.id) || 0} AND owner_id = ${me.id} AND status = 'open' RETURNING id`;
+                if (!r.length) return send(res, 404, { error: 'That request is not waiting any more.' });
+                return send(res, 200, await L.operatorView(sql, me.id));
+            }
+
             default:
                 return send(res, 400, { error: 'Unknown action' });
         }

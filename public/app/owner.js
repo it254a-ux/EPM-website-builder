@@ -1044,11 +1044,11 @@
           steps: ['Message us on WhatsApp and tell us about your business.', 'Share your brand name, colours, logo and any sites you like.', 'We reply with a plan and a quote, then design it with you.'],
           tip: 'Premium, professional design built around your brand.', cta: true },
     ];
-    // One answer at a time, in a popup. Closes with the X button, a click outside, or the Escape key.
-    function openFaq(q, opener) {
+    // One popup at a time, with an X. Closes with the X button, a click outside, or the Escape key. Returns the close function.
+    function popup(icon, title, cls, bodyNode, opener) {
         var old = document.getElementById('faq-modal'); if (old) old.remove();
         var prevOverflow = document.body.style.overflow;
-        var done = false, onKey;
+        var done = false, onKey, overlay;
         function close() {
             if (done) return; done = true;
             document.removeEventListener('keydown', onKey);
@@ -1057,20 +1057,71 @@
             setTimeout(function () { overlay.remove(); if (opener && opener.focus) opener.focus(); }, 200);
         }
         var closeBtn = el('button', { class: 'fm-x', type: 'button', 'aria-label': 'Close', text: '\u2715', onclick: close });
-        var body = el('div', { class: 'fm-body' }, [el('p', { class: 'faq-lead', text: q.a })]);
-        body.appendChild(el('ol', { class: 'faq-steps' }, q.steps.map(function (t) { return el('li', { text: t }); })));
-        if (q.tip) body.appendChild(el('div', { class: 'faq-tip' }, [el('strong', { text: 'Good to know  ' }), el('span', { text: q.tip })]));
-        if (q.cta) body.appendChild(el('a', { class: 'btn dc-btn', href: waLink('Hello EPM, I would like you to design a website for me.'), target: '_blank', rel: 'noopener', text: 'Request a design on WhatsApp' }));
-        var dialog = el('div', { class: 'fm-card ' + q.c, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'fm-title' }, [
-            el('div', { class: 'fm-head' }, [el('span', { class: 'fm-ico', text: q.i }), el('h3', { id: 'fm-title', text: q.q }), closeBtn]), body]);
-        var overlay = el('div', { class: 'faq-modal', id: 'faq-modal' }, [dialog]);
+        var dialog = el('div', { class: 'fm-card ' + cls, role: 'dialog', 'aria-modal': 'true', 'aria-labelledby': 'fm-title' }, [
+            el('div', { class: 'fm-head' }, [el('span', { class: 'fm-ico', text: icon }), el('h3', { id: 'fm-title', text: title }), closeBtn]), bodyNode]);
+        overlay = el('div', { class: 'faq-modal', id: 'faq-modal' }, [dialog]);
         overlay.addEventListener('click', function (e) { if (e.target === overlay) close(); });
         onKey = function (e) { if (e.key === 'Escape') close(); };
         document.addEventListener('keydown', onKey);
         document.body.style.overflow = 'hidden';
         document.body.appendChild(overlay);
         closeBtn.focus();
+        return close;
     }
+    function designButton(text, cls) { return el('button', { class: 'btn ' + (cls || 'dc-btn'), type: 'button', text: text, onclick: function (e) { openDesignForm(e.currentTarget); } }); }
+
+    function openFaq(q, opener) {
+        var body = el('div', { class: 'fm-body' }, [el('p', { class: 'faq-lead', text: q.a })]);
+        body.appendChild(el('ol', { class: 'faq-steps' }, q.steps.map(function (t) { return el('li', { text: t }); })));
+        if (q.tip) body.appendChild(el('div', { class: 'faq-tip' }, [el('strong', { text: 'Good to know  ' }), el('span', { text: q.tip })]));
+        if (q.cta) body.appendChild(designButton('Request a design'));
+        popup(q.i, q.q, q.c, body, opener);
+    }
+
+    var DESIGN_KINDS = ['Trading website', 'Landing page', 'Logo and branding', 'Redesign of my site', 'Something else'];
+    // The design request form. Sends to /api/library (request_design); the answer appears under "Your design requests".
+    function openDesignForm(opener) {
+        var kinds = (S.lib && S.lib.design_kinds) || DESIGN_KINDS;
+        var fBiz = box('Business or brand name', el('input', { type: 'text', name: 'business_name', maxlength: '120', autocomplete: 'organization' }));
+        var fKind = box('What do you need?', el('select', { name: 'kind' }, kinds.map(function (k) { return el('option', { value: k, text: k }); })));
+        var fDet = box('Tell us about it', el('textarea', { name: 'details', maxlength: '3000', placeholder: 'What the site is for, who it is for, the pages or features you want, and the feeling you want it to have.' }));
+        var fCol = box('Colours (optional)', el('input', { type: 'text', name: 'colors', maxlength: '300', placeholder: 'e.g. navy and gold' }));
+        var fLinks = box('Sites you like (optional)', el('input', { type: 'text', name: 'links', maxlength: '300', placeholder: 'Links to designs you admire' }));
+        var fCon = box('How should we reach you? (optional)', el('input', { type: 'text', name: 'contact', maxlength: '300', placeholder: 'WhatsApp or email (default: your account email)' }));
+        var fields = { business_name: fBiz, kind: fKind, details: fDet, colors: fCol, links: fLinks, contact: fCon };
+        var msg = el('div', { class: 'err' });
+        var send = el('button', { class: 'btn primary', type: 'button', text: 'Send request' });
+        var body = el('div', { class: 'fm-body' }, [el('p', { class: 'muted', text: 'Tell us what you need and we will reply here with a plan and a quote.' }),
+            fBiz.wrap, fKind.wrap, fDet.wrap, fCol.wrap, fLinks.wrap, fCon.wrap, el('div', { class: 'row', style: 'margin-top:12px' }, [send, msg])]);
+        var close = popup('\u{1F3A8}', 'Request a website design', 'f1', body, opener);
+        send.addEventListener('click', function () {
+            Object.keys(fields).forEach(function (k) { fields[k].setError(''); }); msg.textContent = ''; send.disabled = true;
+            var payload = { action: 'request_design' };
+            Object.keys(fields).forEach(function (k) { payload[k] = fields[k].wrap.querySelector('input,select,textarea').value; });
+            api('/api/library', 'POST', payload).then(function (r) {
+                send.disabled = false;
+                if (r.designs) { close(); toast('Request sent. We will reply under Support.'); if ((location.hash || '') === '#/support') route(); return; }
+                if (r.fields) Object.keys(r.fields).forEach(function (k) { if (fields[k]) fields[k].setError(r.fields[k]); });
+                else msg.textContent = r.error || 'Could not send the request.';
+            });
+        });
+    }
+    var DESIGN_STATUS = { open: ['Waiting', 'pending'], in_progress: ['In progress', 'active'], done: ['Done', 'active'], declined: ['Declined', 'suspended'], cancelled: ['Cancelled', ''] };
+    function designList(card, d) {
+        clear(card); card.appendChild(el('h2', { text: 'Your design requests' }));
+        var list = (d && d.designs) || [];
+        if (!list.length) { card.appendChild(el('p', { class: 'muted', text: 'No design requests yet. Use the Request a design button above.' })); return; }
+        card.appendChild(simpleTable(['Sent', 'Request', 'Status', ''], list.map(function (r) {
+            var st = DESIGN_STATUS[r.status] || [r.status, ''];
+            var last = r.status === 'open'
+                ? el('button', { class: 'btn', type: 'button', text: 'Cancel', onclick: function () {
+                    if (!confirm('Cancel this request?')) return;
+                    api('/api/library', 'POST', { action: 'cancel_design', id: r.id }).then(function (x) { if (x.designs) { toast('Request cancelled.'); designList(card, x); } else toast(x.error || 'Could not cancel.'); }); } })
+                : (r.admin_note || '');
+            return [fmtDate(r.created_at), el('div', {}, [el('b', { text: r.business_name }), el('div', { class: 'muted small', text: r.kind })]), pill(st[0], st[1]), last];
+        })));
+    }
+
     function supportView() {
         var v = el('div');
         v.appendChild(head('Help', 'Support', 'Chat with us on WhatsApp, or browse answers to common questions.'));
@@ -1079,7 +1130,7 @@
         v.appendChild(el('div', { class: 'design-cta' }, [
             el('div', { class: 'dc-text' }, [el('span', { class: 'dc-kicker', text: 'Custom design' }), el('h2', { text: 'Want a premium website designed for you?' }),
                 el('p', { text: 'Tell us about your brand and we will design a professional, one-of-a-kind website for you.' })]),
-            el('a', { class: 'btn dc-btn', href: waLink('Hello EPM, I would like you to design a website for me.'), target: '_blank', rel: 'noopener', text: 'Request a design' })]));
+            designButton('Request a design')]));
         var faq = el('div', { class: 'faq' }, [el('h2', { class: 'faq-title', text: 'Frequently asked questions' }), el('p', { class: 'muted', text: 'Tap a question to see the full answer.' })]);
         FAQ.forEach(function (q) {
             var card = el('button', { class: 'faq-item ' + q.c, type: 'button', 'aria-haspopup': 'dialog' }, [el('span', { class: 'faq-ico', text: q.i }), el('span', { class: 'faq-q', text: q.q }), el('span', { class: 'faq-chev', text: '\u203A' })]);
@@ -1087,6 +1138,9 @@
             faq.appendChild(card);
         });
         v.appendChild(faq);
+        var dcard = el('div', { class: 'card' }, [el('h2', { text: 'Your design requests' }), el('p', { class: 'muted', text: 'Loading\u2026' })]);
+        v.appendChild(dcard);
+        if (S.lib && S.lib.designs) designList(dcard, S.lib); else api('/api/library').then(function (d) { if (viewEl && viewEl.contains(dcard)) designList(dcard, d); });
         return v;
     }
 

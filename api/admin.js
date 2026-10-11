@@ -29,7 +29,7 @@ const audit = (sql, adminId, action, target, detail) =>
 //   3. state-changing calls must come from the same site (no cross-site posts)
 //
 //   GET  /api/admin?resource=all | sites | owners | audit | pool | deriv | commissions | library
-//   POST /api/admin  { action: set_status | update_site | approve_custom | connect_domain | order_refunded | order_retry | order_complete | create_app | deriv_test | commission_sync | confirm_month | payout_paid | payout_reject | library_remove | library_restore | request_answer | set_app_id | set_markup | pool_add | pool_remove | assign_from_pool | set_rate | disable_owner | delete_site | delete_owner, ... }
+//   POST /api/admin  { action: set_status | update_site | approve_custom | connect_domain | order_refunded | order_retry | order_complete | create_app | deriv_test | commission_sync | confirm_month | payout_paid | payout_reject | library_remove | library_restore | request_answer | design_answer | set_app_id | set_markup | pool_add | pool_remove | assign_from_pool | set_rate | disable_owner | delete_site | delete_owner, ... }
 module.exports = async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store');
     if (!A.onPlatformHost(req, 'strict')) return send(res, 404, { error: 'Not found' });
@@ -454,6 +454,17 @@ module.exports = async function handler(req, res) {
                 const r = await sql`UPDATE site_bot_requests SET status = ${body.status}, admin_note = ${note || null}, decided_at = now() WHERE id = ${Number(body.id) || 0} AND status = 'open' RETURNING id`;
                 if (!r.length) return send(res, 404, { error: 'That request is not open.' });
                 await audit(sql, me.id, 'request_answer', r[0].id, { status: body.status });
+                return send(res, 200, await L.adminView(sql));
+            }
+
+            case 'design_answer': {
+                if (!['in_progress', 'done', 'declined'].includes(body.status)) return send(res, 400, { error: 'Choose in progress, done or declined.' });
+                const note = L.clean(body.note, L.LIMITS.note);
+                if (body.status === 'declined' && !note) return send(res, 400, { error: 'Write a short reason. The operator will see it.' });
+                const r = await sql`UPDATE design_requests SET status = ${body.status}, admin_note = ${note || null}, decided_at = CASE WHEN ${body.status} = 'in_progress' THEN NULL ELSE now() END
+                                    WHERE id = ${Number(body.id) || 0} AND status IN ('open', 'in_progress') RETURNING id`;
+                if (!r.length) return send(res, 404, { error: 'That request is not open.' });
+                await audit(sql, me.id, 'design_answer', r[0].id, { status: body.status });
                 return send(res, 200, await L.adminView(sql));
             }
 

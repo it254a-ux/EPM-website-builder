@@ -171,7 +171,7 @@
                         el('span', { class: needs ? 'pill bad' : 'pill', text: o.status }), (o.failure_reason || '') + (o.refund_reference ? ' Refund ' + o.refund_reference : ''), btns];
                 });
                 var tot = r.totals || { orders: 0, revenue_kes: 0, margin_usd: 0 };
-                holder.appendChild(el('p', {}, [el('strong', { text: tot.orders + (tot.orders === 1 ? ' finished order' : ' finished orders') }), ' \u00b7 KES ' + Number(tot.revenue_kes).toLocaleString('en-KE') + ' received \u00b7 margin $' + Number(tot.margin_usd).toFixed(2) + ' before M-Pesa fees']));
+                holder.appendChild(el('p', {}, [el('strong', { text: tot.orders + (tot.orders === 1 ? ' finished order' : ' finished orders') }), document.createTextNode(' \u00b7 KES ' + Number(tot.revenue_kes).toLocaleString('en-KE') + ' received \u00b7 margin $' + Number(tot.margin_usd).toFixed(2) + ' before M-Pesa fees')]));
                 holder.appendChild(el('p', { class: 'muted', text: 'Orders that need you come first. Money is only taken after Safaricom confirms it.' }));
                 holder.appendChild(rows.length ? table(['Created', 'Operator', 'Domain', 'Paid', 'Your cost', 'Margin', 'Status', 'Note', ''], rows) : el('p', { class: 'muted', text: 'No domain orders yet.' }));
             });
@@ -211,6 +211,29 @@
             });
             var intro = 'Bots go live the moment an operator adds them. Check this list and remove anything unsafe; the operator sees your reason. ' +
                 (lb.storage_ready ? 'Document uploads are on.' : 'Document uploads are OFF: add BLOB_READ_WRITE_TOKEN in Vercel (create a Blob store first) and redeploy.');
+            var designs = lb.designs || [];
+            var designOpen = designs.filter(function (d) { return d.status === 'open' || d.status === 'in_progress'; });
+            var designRows = designs.map(function (d) {
+                var btns = el('div', { class: 'row' });
+                if (d.status === 'open' || d.status === 'in_progress') {
+                    if (d.status === 'open') btns.appendChild(el('button', { text: 'Start', onclick: function () {
+                        var note = prompt('Optional note for the operator (they see it):', 'We have started on your design.'); if (note === null) return;
+                        act({ action: 'design_answer', id: d.id, status: 'in_progress', note: note.trim() }); } }));
+                    btns.appendChild(el('button', { class: 'primary', text: 'Done', onclick: function () {
+                        var note = prompt('Note for the operator, for example where you sent the design:', ''); if (note === null) return;
+                        act({ action: 'design_answer', id: d.id, status: 'done', note: note.trim() }); } }));
+                    btns.appendChild(el('button', { text: 'Decline', onclick: function () {
+                        var note = prompt('Reason (the operator sees this):', ''); if (note === null || !note.trim()) return;
+                        act({ action: 'design_answer', id: d.id, status: 'declined', note: note.trim() }); } }));
+                }
+                var info = el('div', {}, [el('b', { text: d.business_name + ' · ' + d.kind }), el('div', { class: 'muted', text: d.details }),
+                    el('div', { class: 'muted', text: [d.colors && 'Colours: ' + d.colors, d.links && 'Likes: ' + d.links, 'Contact: ' + d.contact].filter(Boolean).join(' · ') })]);
+                return [when(d.created_at), (d.owner_name || '') + ' ' + (d.owner_email || '') + (d.site_domain ? ' · ' + d.site_domain : ''), info,
+                    el('span', { class: d.status === 'open' ? 'pill bad' : 'pill', text: d.status + (d.admin_note ? ' · ' + d.admin_note : '') }), btns];
+            });
+            app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Website design requests (' + designOpen.length + ' open)' }),
+                el('p', { class: 'muted', text: 'Operators ask for a custom website here. Contact them, then mark it in progress or done. They see your note.' }),
+                designRows.length ? table(['Sent', 'From', 'Request', 'Status', ''], designRows) : el('p', { class: 'muted', text: 'No design requests yet.' })]));
             app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Operator bots and documents' }), el('p', { class: 'muted', text: intro }),
                 el('h2', { style: 'margin-top:8px', text: 'Bot requests (' + reqOpen.length + ' waiting)' }),
                 reqRows.length ? table(['Sent', 'From', 'Request', 'Status', ''], reqRows) : el('p', { class: 'muted', text: 'No requests yet.' }),

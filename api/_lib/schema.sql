@@ -286,3 +286,22 @@ CREATE TABLE IF NOT EXISTS wallet_debits (
 CREATE INDEX IF NOT EXISTS wallet_debits_owner_idx ON wallet_debits (owner_id, id DESC);
 -- One wallet payment in flight per operator at a time (same idea as the single open withdrawal).
 CREATE UNIQUE INDEX IF NOT EXISTS wallet_one_held_idx ON wallet_debits (owner_id) WHERE status = 'held';
+
+-- ===== Website design requests =====
+-- An operator asks you to design them a website. You answer in the admin panel; they see the status.
+CREATE TABLE IF NOT EXISTS design_requests (
+    id            SERIAL PRIMARY KEY,
+    owner_id      INTEGER NOT NULL REFERENCES owners(id) ON DELETE CASCADE,
+    site_id       INTEGER REFERENCES sites(id) ON DELETE SET NULL,
+    business_name TEXT NOT NULL,
+    kind          TEXT NOT NULL,
+    details       TEXT NOT NULL,
+    colors        TEXT,
+    links         TEXT,
+    contact       TEXT NOT NULL,
+    status        TEXT NOT NULL DEFAULT 'open',       -- open | in_progress | done | declined | cancelled
+    admin_note    TEXT,
+    created_at    TIMESTAMPTZ NOT NULL DEFAULT now(),
+    decided_at    TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS design_requests_owner_idx ON design_requests (owner_id, id DESC);
