@@ -28,18 +28,46 @@
         app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Admin sign in' }), email, el('div', { style: 'height:8px' }), pw, msg, el('div', { style: 'margin-top:10px' }, [go])]));
     }
 
+    // Columns holding money are right-aligned; earnings columns are tinted green.
+    var NUM_HEAD = /^(Earned|Deriv markup|Operators|Your part|Your cost|Margin|Amount|Paid|Free|Used|Days)/;
     function table(headers, rows) {
-        var t = el('table', {}, [el('tr', {}, headers.map(function (h) { return el('th', { text: h }); }))]);
-        rows.forEach(function (cells) { t.appendChild(el('tr', {}, cells.map(function (c) { return el('td', {}, [typeof c === 'string' ? document.createTextNode(c) : c]); }))); });
+        var num = headers.map(function (h) { return NUM_HEAD.test(h); });
+        var t = el('table', {}, [el('tr', {}, headers.map(function (h, i) { return el('th', { text: h, class: num[i] ? 'num' : '' }); }))]);
+        rows.forEach(function (cells) { t.appendChild(el('tr', {}, cells.map(function (c, i) {
+            var cls = num[i] ? 'num' + (/^Earned/.test(headers[i]) ? ' pos' : '') : '';
+            return el('td', { class: cls }, [typeof c === 'string' ? document.createTextNode(c) : c]); }))); });
         return el('div', { class: 'scroll' }, [t]);
     }
+
+    // Colour the status pills by what they say (display only).
+    function decoratePills(root) {
+        Array.prototype.forEach.call((root || app).querySelectorAll('.pill'), function (p) {
+            var t = (p.textContent || '').toLowerCase();
+            p.classList.remove('ok', 'bad', 'warn');
+            if (/^(active|live|done|completed|paid|confirmed)/.test(t)) p.classList.add('ok');
+            else if (/^(suspended|cancelled|canceled|declined|rejected|removed|refund|failed|add apps|short)/.test(t)) p.classList.add('bad');
+            else if (/^(awaiting|requested|open|in_progress|check_needed|paid_pending|running low|\d+ waiting|buying|update)/.test(t) || /update on deriv/.test(t)) p.classList.add('warn');
+        });
+    }
+
+    // Light / dark switch in the top bar. "auto" follows the device.
+    function currentTheme() { try { return localStorage.getItem('admin-theme') || 'auto'; } catch (e) { return 'auto'; } }
+    function applyTheme(t) {
+        if (t === 'light' || t === 'dark') document.documentElement.setAttribute('data-theme', t); else document.documentElement.removeAttribute('data-theme');
+        try { localStorage.setItem('admin-theme', t); } catch (e) { /* private mode: fine */ }
+    }
+    applyTheme(currentTheme());
 
     function money(n) { return '$' + Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); }
 
     function render(sites, owners, pool, dv, cm, lb) {
         clear();
-        app.appendChild(el('div', { class: 'row', style: 'justify-content:space-between' }, [
-            el('span', { class: 'muted', text: sites.length + ' sites · ' + owners.length + ' accounts' }),
+        var themeBtn = el('button', { text: 'Theme: ' + currentTheme(), title: 'Switch between automatic, light and dark', onclick: function () {
+            var next = { auto: 'light', light: 'dark', dark: 'auto' }[currentTheme()] || 'auto'; applyTheme(next); themeBtn.textContent = 'Theme: ' + next; } });
+        app.appendChild(el('div', { class: 'admin-bar' }, [
+            el('span', { class: 'brand' }, [document.createTextNode('Executive Prime Markets '), el('small', { text: 'Admin' })]),
+            el('span', { class: 'counts', text: sites.length + ' sites \u00b7 ' + owners.length + ' accounts' }),
+            themeBtn,
             el('button', { text: 'Sign out', onclick: function () { api('/api/auth?action=logout', 'POST').then(login); } })]));
 
         // ----- App ID stock (computed first so the warning sits on top) -----
@@ -88,7 +116,9 @@
                 if (v === null) return; act({ action: 'set_rate', site_id: s.id, platform_share: v.trim() === '' ? null : Number(v) }); } }));
             btns.appendChild(el('button', { text: 'Delete', onclick: function () {
                 if (confirm('Permanently delete the site "' + s.name + '" (' + s.domain + ')? This cannot be undone.')) act({ action: 'delete_site', site_id: s.id }); } }));
-            return [s.name, s.domain, s.plan, el('span', { class: 'pill', text: s.status }), s.platform_share + '%', (s.markup_pending ? el('span', { class: 'pill', text: Number(s.markup_percent) + '% \u00b7 update on Deriv' }) : Number(s.markup_percent) + '%'), s.app_id ? (s.app_source === 'api' ? s.app_id + ' \u00b7 auto' : s.app_id) : el('span', { class: 'pill', text: 'awaiting App ID' }), s.app_id ? money(s.earned_total) : '\u2014', s.app_id ? money(s.earned_month) : '\u2014', s.owner_email || '', btns];
+            var siteCell = el('div', {}, [el('div', { class: 'site-name', text: s.name }), el('div', { class: 'muted', text: s.domain }), el('div', { class: 'muted', text: s.owner_email || '' })]);
+            var statusCell = el('div', {}, [el('span', { class: 'pill', text: s.status }), el('div', { class: 'muted', text: s.plan })]);
+            return [siteCell, statusCell, s.platform_share + '%', (s.markup_pending ? el('span', { class: 'pill', text: Number(s.markup_percent) + '% \u00b7 update on Deriv' }) : Number(s.markup_percent) + '%'), el('span', { class: 'appid' }, [document.createTextNode(s.app_id ? (s.app_source === 'api' ? s.app_id + ' \u00b7 auto' : s.app_id) : '')].concat(s.app_id ? [] : [el('span', { class: 'pill', text: 'awaiting App ID' })])), s.app_id ? money(s.earned_total) : '\u2014', s.app_id ? money(s.earned_month) : '\u2014', btns];
         });
         // ----- Deriv connection -----
         var dvMsg = el('div', { class: 'muted' });
@@ -100,7 +130,7 @@
                 dvMsg.textContent = r.error ? r.error : 'Connected to Deriv with the Admin scope' + (r.loginid ? ' (account ' + r.loginid + ')' : '') + (r.missing && r.missing.length ? '. Still missing: ' + r.missing.join(', ') + '.' : '. Ready.'); }); } });
         if (dv.enabled) app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Deriv connection' }), el('p', { class: 'muted', text: dvText }), el('div', { class: 'row' }, [testBtn, dvMsg])]));
 
-        app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Sites' }), table(['Name', 'Domain', 'Plan', 'Status', 'You keep', 'Markup', 'App ID', 'Earned (all time)', 'Earned (this month)', 'Owner', 'Actions'], siteRows)]));
+        app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Sites' }), table(['Site', 'Status', 'You keep', 'Markup', 'App ID', 'Earned (all time)', 'Earned (this month)', 'Actions'], siteRows)]));
 
         // ----- Commissions -----
         (function () {
@@ -176,6 +206,7 @@
                 holder.appendChild(el('p', {}, [el('strong', { text: tot.orders + (tot.orders === 1 ? ' finished order' : ' finished orders') }), document.createTextNode(' \u00b7 KES ' + Number(tot.revenue_kes).toLocaleString('en-KE') + ' received \u00b7 margin $' + Number(tot.margin_usd).toFixed(2) + ' before M-Pesa fees')]));
                 holder.appendChild(el('p', { class: 'muted', text: 'Orders that need you come first. Money is only taken after Safaricom confirms it.' }));
                 holder.appendChild(rows.length ? table(['Created', 'Operator', 'Domain', 'Paid', 'Your cost', 'Margin', 'Status', 'Note', ''], rows) : el('p', { class: 'muted', text: 'No domain orders yet.' }));
+                decoratePills(holder);
             });
         })();
 
@@ -275,16 +306,56 @@
         });
         app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Accounts' }), table(['Email', 'Name', 'Role', 'State', ''], ownerRows)]));
 
-        // Jump-to-section chips under the top bar (display only; links to the cards above)
-        var nav = el('div', { class: 'admin-nav' });
-        var n = 0;
-        Array.prototype.forEach.call(app.querySelectorAll(':scope > .card'), function (card) {
+        // ----- Section menu, earnings strip and "needs you" counts (display only) -----
+        var sumTotal = 0, sumMonth = 0, active = 0;
+        sites.forEach(function (x) { sumTotal += Number(x.earned_total || 0); sumMonth += Number(x.earned_month || 0); if (x.status === 'active') active++; });
+        var wd = (cm.requests || []).filter(function (r) { return r.status === 'requested'; }).length;
+        var dz = ((lb.designs || []).filter(function (d) { return d.status === 'open' || d.status === 'in_progress'; })).length;
+        var bq = ((lb.requests || []).filter(function (r) { return r.status === 'open'; })).length;
+        var awaiting = sites.filter(function (x) { return !x.app_id; }).length;
+        var attention = [];
+        if (wd) attention.push(wd + (wd === 1 ? ' withdrawal' : ' withdrawals'));
+        if (dz) attention.push(dz + ' design');
+        if (bq) attention.push(bq + ' bot request' + (bq === 1 ? '' : 's'));
+        if (awaiting) attention.push(awaiting + ' awaiting App ID');
+        function tile(cls, label, value, sub) {
+            return el('div', { class: 'stat ' + cls }, [el('div', { class: 'label', text: label }), el('div', { class: 'value', text: value }), el('div', { class: 'sub', text: sub })]);
+        }
+        var monthName = new Date().toLocaleString('en-GB', { month: 'long', year: 'numeric' });
+        var attnTile = tile('alert', 'Needs you', String(wd + dz + bq + awaiting), attention.length ? attention.join(' \u00b7 ') : 'Nothing waiting');
+        if (!attention.length) attnTile.className = 'stat calm';
+        var stats = el('div', { class: 'stats' }, [
+            tile('money', 'Earned, all time', money(sumTotal), 'Deriv markup across ' + sites.length + (sites.length === 1 ? ' site' : ' sites')),
+            tile('money', 'Earned, ' + monthName, money(sumMonth), 'Resets on the 1st'),
+            attnTile,
+            tile('calm', 'Active sites', String(active), 'of ' + sites.length + ' \u00b7 ' + owners.length + ' accounts')]);
+
+        var nav = el('nav', { class: 'admin-nav', 'aria-label': 'Sections' });
+        var n = 0, dots = { 'Commissions': wd, 'Website design requests': dz, 'Operator bots and documents': bq };
+        var cards = Array.prototype.filter.call(app.children, function (c) { return c.classList.contains('card'); });
+        cards.forEach(function (card) {
             var h = card.firstChild;
             if (!h || h.tagName !== 'H2') return;
+            var label = h.textContent.replace(/\s*\(.*\)\s*$/, '');
+            if (label === 'Commissions') card.classList.add('money-card');
             card.id = 'sec-' + (++n);
-            nav.appendChild(el('a', { href: '#sec-' + n, text: h.textContent.replace(/\s*\(.*\)\s*$/, '') }));
+            var a = el('a', { href: '#sec-' + n, text: label });
+            if (dots[label]) a.appendChild(el('span', { class: 'dot', text: String(dots[label]) }));
+            nav.appendChild(a);
         });
-        if (n > 2 && app.firstChild) app.insertBefore(nav, app.firstChild.nextSibling);
+        var bar = app.firstChild;
+        if (n > 2) { app.insertBefore(nav, bar.nextSibling); app.insertBefore(stats, nav.nextSibling); } else app.insertBefore(stats, bar.nextSibling);
+
+        // highlight the section being read
+        if (window.IntersectionObserver && n > 2) {
+            var links = nav.querySelectorAll('a');
+            var io = new IntersectionObserver(function (entries) {
+                entries.forEach(function (e) { if (e.isIntersecting) {
+                    Array.prototype.forEach.call(links, function (l) { l.classList.toggle('on', l.getAttribute('href') === '#' + e.target.id); }); } });
+            }, { rootMargin: '-72px 0px -65% 0px' });
+            cards.forEach(function (c) { if (c.id) io.observe(c); });
+        }
+        decoratePills(app);
     }
 
     // One request brings every list (the server reads them at the same time). Falls back to separate requests if it is not there yet.
