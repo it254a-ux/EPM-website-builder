@@ -5,6 +5,8 @@ const { logEvent } = require('./_lib/events');
 const { assignFromPool, assignWaiting } = require('./_lib/app-pool');
 const deriv = require('./_lib/deriv-apps');
 const DO = require('./_lib/domain-orders');
+const PO = require('./_lib/payouts');
+const M = require('./_lib/mpesa');
 const { provisionApp, syncAppToDeriv, reasonOf } = require('./_lib/site-app');
 const C = require('./_lib/commissions');
 const W = require('./_lib/wallet');
@@ -29,7 +31,15 @@ const audit = (sql, adminId, action, target, detail) =>
 //   3. state-changing calls must come from the same site (no cross-site posts)
 //
 //   GET  /api/admin?resource=all | sites | owners | audit | pool | deriv | commissions | library
-//   POST /api/admin  { action: set_status | update_site | approve_custom | connect_domain | order_refunded | order_retry | order_complete | create_app | deriv_test | commission_sync | confirm_month | payout_paid | payout_reject | library_remove | library_restore | request_answer | design_answer | set_app_id | set_markup | pool_add | pool_remove | assign_from_pool | set_rate | disable_owner | delete_site | delete_owner, ... }
+//   POST /api/admin  { action: set_status | update_site | approve_custom | connect_domain | order_refunded | order_retry | order_complete | create_app | deriv_test | commission_sync | confirm_month | payout_paid | payout_send | payout_release | payout_reject | library_remove | library_restore | request_answer | design_answer | set_app_id | set_markup | pool_add | pool_remove | assign_from_pool | set_rate | disable_owner | delete_site | delete_owner, ... }
+// Why a payout could not be marked paid or rejected: money is on its way (say so), or it is simply no longer waiting.
+async function sendingNote(sql, id) {
+    const cur = (await sql`SELECT send_state FROM payout_requests WHERE id = ${Number(id) || 0}`)[0];
+    return cur && cur.send_state === 'sending'
+        ? [409, { error: 'Money is being sent for this request right now. Wait for M-Pesa to confirm, or release it after 10 minutes if nothing arrives.' }]
+        : [404, { error: 'That request is not waiting any more.' }];
+}
+
 module.exports = async function handler(req, res) {
     res.setHeader('Cache-Control', 'no-store');
     if (!A.onPlatformHost(req, 'strict')) return send(res, 404, { error: 'Not found' });
@@ -355,16 +365,27 @@ module.exports = async function handler(req, res) {
             case 'payout_paid': {
                 const reference = String(body.reference || '').trim();
                 if (!/^[A-Za-z0-9][A-Za-z0-9 _.\-]{2,99}$/.test(reference)) return send(res, 400, { error: 'Enter the M-Pesa code or transaction hash (3 to 100 letters, numbers, spaces, dots or dashes).' });
-                const r = await sql`UPDATE payout_requests SET status = 'paid', reference = ${reference}, decided_at = now() WHERE id = ${Number(body.id) || 0} AND status = 'requested' RETURNING id, owner_id, amount_usd`;
-                if (!r.length) return send(res, 404, { error: 'That request is not waiting any more.' });
+                const r = await sql`UPDATE payout_requests SET status = 'paid', reference = ${reference}, decided_at = now(), send_error = NULL WHERE id = ${Number(body.id) || 0} AND status = 'requested' AND send_state IS NULL RETURNING id, owner_id, amount_usd`;
+                if (!r.length) return send(res, ...(await sendingNote(sql, body.id)));
                 await audit(sql, me.id, 'payout_paid', r[0].id, { owner_id: r[0].owner_id, amount_usd: Number(r[0].amount_usd), reference });
                 return send(res, 200, { ok: true });
             }
 
+            case 'payout_send': {
+                const out = await PO.sendMpesa(sql, Number(body.id) || 0, A.requestHost(req));
+                if (!out.ok) return send(res, out.code, { error: out.error });
+                await audit(sql, me.id, 'payout_send', Number(body.id), { kes: out.request.sent_kes, unclear: !!out.unclear });
+                return send(res, 200, out.unclear ? { ok: true, warning: out.request.send_error } : { ok: true, notice: `Sent KES ${out.request.sent_kes} to ${out.request.destination}. It ticks to paid when M-Pesa confirms.` });
+            }
+            case 'payout_release': {
+                if (!(await PO.release(sql, Number(body.id) || 0))) return send(res, 409, { error: `Only a send that has been waiting more than ${PO.RELEASE_AFTER_MINUTES} minutes can be released.` });
+                await audit(sql, me.id, 'payout_release', Number(body.id), {});
+                return send(res, 200, { ok: true });
+            }
             case 'payout_reject': {
                 const note = String(body.note || '').replace(/[\u0000-\u001F]/g, '').trim().slice(0, 200) || null;
-                const r = await sql`UPDATE payout_requests SET status = 'rejected', note = ${note}, decided_at = now() WHERE id = ${Number(body.id) || 0} AND status = 'requested' RETURNING id, owner_id, amount_usd`;
-                if (!r.length) return send(res, 404, { error: 'That request is not waiting any more.' });
+                const r = await sql`UPDATE payout_requests SET status = 'rejected', note = ${note}, decided_at = now(), send_error = NULL WHERE id = ${Number(body.id) || 0} AND status = 'requested' AND send_state IS NULL RETURNING id, owner_id, amount_usd`;
+                if (!r.length) return send(res, ...(await sendingNote(sql, body.id)));
                 await audit(sql, me.id, 'payout_reject', r[0].id, { owner_id: r[0].owner_id, amount_usd: Number(r[0].amount_usd), note });
                 return send(res, 200, { ok: true });
             }

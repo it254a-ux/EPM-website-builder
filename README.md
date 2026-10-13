@@ -143,3 +143,14 @@ When you approve an operator's own domain, the platform can add it to the Vercel
 3. Redeploy. In the admin panel, **Approve** now adds the domain to Vercel. Each own-domain site also has a **Connect to Vercel** button to retry.
 
 Untested against live Vercel until the first real approval.
+
+## Paying operators through the system (M-Pesa business payment)
+
+In the admin panel, **Commissions**, then **Withdrawal requests**: **Pay with M-Pesa** sends the money and the request ticks to paid by itself when Safaricom confirms. **Mark paid (sent another way)** is for paying by hand or by USDT. A request that could not be sent stays pending with the reason shown.
+
+Needs Safaricom's business payment product (B2C), which is separate from the payment prompt and needs its own approval. Settings in Vercel:
+- `MPESA_B2C_SHORTCODE`, `MPESA_B2C_INITIATOR`
+- `MPESA_B2C_CREDENTIAL` (the ready-made Security Credential), or `MPESA_B2C_INITIATOR_PASSWORD` plus `MPESA_B2C_CERT` (Safaricom's certificate text)
+- the existing `MPESA_ENV`, `MPESA_CONSUMER_KEY`, `MPESA_CONSUMER_SECRET`, `MPESA_CALLBACK_SECRET` and a live exchange rate
+
+Untested against live Safaricom. The SQL is at the end of `api/_lib/schema.sql` (six `ALTER TABLE payout_requests` lines).

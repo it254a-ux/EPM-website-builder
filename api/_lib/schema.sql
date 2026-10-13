@@ -305,3 +305,12 @@ CREATE TABLE IF NOT EXISTS design_requests (
     decided_at    TIMESTAMPTZ
 );
 CREATE INDEX IF NOT EXISTS design_requests_owner_idx ON design_requests (owner_id, id DESC);
+
+-- Paying operators through the system (M-Pesa business payment). The request stays 'requested' while money is in flight,
+-- so every existing balance rule keeps working; these columns say what is happening with the sending.
+ALTER TABLE payout_requests ADD COLUMN IF NOT EXISTS send_state         TEXT;            -- NULL | 'sending'
+ALTER TABLE payout_requests ADD COLUMN IF NOT EXISTS sent_kes           INTEGER;         -- shillings sent
+ALTER TABLE payout_requests ADD COLUMN IF NOT EXISTS fx_rate            NUMERIC(12,4);
+ALTER TABLE payout_requests ADD COLUMN IF NOT EXISTS b2c_conversation   TEXT;            -- Safaricom's reference for the attempt
+ALTER TABLE payout_requests ADD COLUMN IF NOT EXISTS send_error         TEXT;            -- why the last try did not finish, in plain words
+ALTER TABLE payout_requests ADD COLUMN IF NOT EXISTS sent_at            TIMESTAMPTZ;     -- when the last try started

@@ -50,7 +50,7 @@ module.exports = async function handler(req, res) {
         if (body.action === 'cancel') {
             const r = await sql`
                 UPDATE payout_requests SET status = 'cancelled', decided_at = now()
-                WHERE id = ${Number(body.id) || 0} AND owner_id = ${me.id} AND status = 'requested' RETURNING id`;
+                WHERE id = ${Number(body.id) || 0} AND owner_id = ${me.id} AND status = 'requested' AND send_state IS NULL RETURNING id`;
             if (!r.length) return send(res, 404, { error: 'That request is not waiting any more.' });
             await sql`INSERT INTO audit_log (owner_id, action, target, detail) VALUES (${me.id}, 'payout_cancelled', ${String(r[0].id)}, '{}'::jsonb)`;
             return send(res, 200, await C.operatorView(sql, me.id));

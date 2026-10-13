@@ -281,6 +281,7 @@ async function adminView(sql) {
         GROUP BY 1, m.month ORDER BY 1 DESC LIMIT 12`,
     sql`
         SELECT p.id, p.owner_id, p.amount_usd, p.method, p.network, p.destination, p.status, p.reference, p.note, p.created_at, p.decided_at,
+               p.send_state, p.send_error, p.sent_kes, p.sent_at,
                o.email AS owner_email, o.name AS owner_name, s.domain AS site_domain
         FROM payout_requests p LEFT JOIN owners o ON o.id = p.owner_id LEFT JOIN sites s ON s.owner_id = p.owner_id
         ORDER BY (p.status = 'requested') DESC, p.id DESC LIMIT 60`,
@@ -293,6 +294,7 @@ async function adminView(sql) {
             markup_usd: cents(m.markup), owner_usd: cents(m.owner_usd), platform_usd: cents(num(m.markup) - num(m.owner_usd)), confirmed: !!m.confirmed,
         })),
         requests: requests.map(r => ({ ...r, amount_usd: cents(r.amount_usd) })),
+        b2c_ready: require('./mpesa').b2cConfigured(),
     };
 }
 

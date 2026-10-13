@@ -134,4 +134,76 @@ function parseCallback(body) {
     };
 }
 
-module.exports = { settings, isConfigured, missingSettings, setTransport, defaultTransport, normalizePhone, timestamp, passwordFor, stkPush, stkQuery, parseCallback };
+// ---------- paying out: M-Pesa business payment (B2C) ----------
+// Settings (all in Vercel). B2C is a separate Safaricom product from the payment prompt above, with its own approval.
+//   MPESA_B2C_SHORTCODE            the shortcode money is paid FROM (sandbox: from the Daraja "Test credentials" page)
+//   MPESA_B2C_INITIATOR            the API operator username created for it in M-Pesa (sandbox: testapi)
+//   MPESA_B2C_CREDENTIAL           the ready-made Security Credential (the encrypted initiator password), OR instead of it:
+//   MPESA_B2C_INITIATOR_PASSWORD + MPESA_B2C_CERT   the password and Safaricom's certificate (PEM text), and we encrypt it here
+// UNTESTED against live Safaricom.
+const nodeCrypto = require('crypto');
+
+function b2cSettings() {
+    return {
+        shortcode: env('MPESA_B2C_SHORTCODE'), initiator: env('MPESA_B2C_INITIATOR'),
+        credential: env('MPESA_B2C_CREDENTIAL'), password: env('MPESA_B2C_INITIATOR_PASSWORD'),
+        cert: env('MPESA_B2C_CERT').replace(/\\n/g, '\n'),
+    };
+}
+function b2cMissing() {
+    const b = b2cSettings(), s = settings(), out = [];
+    if (!s.key || !s.secret) out.push('MPESA_CONSUMER_KEY / MPESA_CONSUMER_SECRET');
+    if (!s.callbackSecret) out.push('MPESA_CALLBACK_SECRET');
+    if (!b.shortcode) out.push('MPESA_B2C_SHORTCODE');
+    if (!b.initiator) out.push('MPESA_B2C_INITIATOR');
+    if (!b.credential && !(b.password && b.cert)) out.push('MPESA_B2C_CREDENTIAL (or MPESA_B2C_INITIATOR_PASSWORD with MPESA_B2C_CERT)');
+    return out;
+}
+const b2cConfigured = () => b2cMissing().length === 0;
+
+function securityCredential() {
+    const b = b2cSettings();
+    if (b.credential) return b.credential;
+    return nodeCrypto.publicEncrypt({ key: nodeCrypto.createPublicKey(b.cert), padding: nodeCrypto.constants.RSA_PKCS1_PADDING }, Buffer.from(b.password)).toString('base64');
+}
+
+// Asks Safaricom to send money. { ok:true, conversationId } | { ok:false, kind:'rejected'|'unclear', error }
+//   rejected  Safaricom refused before sending anything. Safe to try again.
+//   unclear   we cannot tell if it went through (no answer). A person must check the M-Pesa statement.
+async function b2cPay({ phone, amountKes, remarks, resultUrl, timeoutUrl }) {
+    const b = b2cSettings();
+    let cred;
+    try { cred = securityCredential(); } catch (err) { return { ok: false, kind: 'rejected', error: 'The M-Pesa payout certificate or password is not valid.' }; }
+    let res;
+    try {
+        res = await post('/mpesa/b2c/v1/paymentrequest', {
+            InitiatorName: b.initiator, SecurityCredential: cred, CommandID: 'BusinessPayment', Amount: Math.floor(amountKes),
+            PartyA: b.shortcode, PartyB: phone, Remarks: String(remarks || 'Payout').slice(0, 100), QueueTimeOutURL: timeoutUrl, ResultURL: resultUrl, Occasion: 'Payout',
+        });
+    } catch (err) {
+        if (/refused our keys/.test(err.message)) return { ok: false, kind: 'rejected', error: 'M-Pesa refused our keys.' };
+        return { ok: false, kind: 'unclear', error: 'No answer from M-Pesa. It may or may not have been sent.' };
+    }
+    const status = res && res.status, bdy = (res && res.body) || {};
+    if (status === 200 && String(bdy.ResponseCode) === '0') return { ok: true, conversationId: String(bdy.OriginatorConversationID || bdy.ConversationID || '').slice(0, 80) };
+    if (status >= 500 || !status) return { ok: false, kind: 'unclear', error: 'M-Pesa had a server error. It may or may not have been sent.' };
+    const why = String(bdy.errorMessage || bdy.ResponseDescription || `error ${status}`).replace(/[\r\n]+/g, ' ').slice(0, 120);
+    return { ok: false, kind: 'rejected', error: `M-Pesa refused it: ${why}` };
+}
+
+// Safaricom's report that a payout finished or failed. Returns null if it does not look like one.
+function parseB2cResult(body) {
+    const r = body && body.Result;
+    if (!r || r.ResultCode === undefined) return null;
+    const params = (r.ResultParameters && Array.isArray(r.ResultParameters.ResultParameter)) ? r.ResultParameters.ResultParameter : [];
+    const get = k => { const p = params.find(x => x && x.Key === k); return p ? p.Value : undefined; };
+    const amount = Number(get('TransactionAmount'));
+    return {
+        code: Number(r.ResultCode), desc: String(r.ResultDesc || '').slice(0, 160),
+        conversation: String(r.OriginatorConversationID || '').slice(0, 80),
+        receipt: String(r.TransactionID || get('TransactionReceipt') || '').slice(0, 40) || null,
+        amount: Number.isFinite(amount) ? amount : null,
+    };
+}
+
+module.exports = { b2cSettings, b2cMissing, b2cConfigured, b2cPay, parseB2cResult, securityCredential, settings, isConfigured, missingSettings, setTransport, defaultTransport, normalizePhone, timestamp, passwordFor, stkPush, stkQuery, parseCallback };

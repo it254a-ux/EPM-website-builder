@@ -158,16 +158,29 @@
             });
             var reqRows = (cm.requests || []).map(function (r) {
                 var btns = el('div', { class: 'row' });
+                var sending = r.send_state === 'sending';
                 if (r.status === 'requested') {
-                    btns.appendChild(el('button', { class: 'primary', text: 'Mark paid', onclick: function () {
-                        var ref = prompt('Pay ' + usd(r.amount_usd) + ' to ' + (r.method === 'mpesa' ? 'M-Pesa ' : 'USDT ' + r.network + ' ') + r.destination + '. Then enter the M-Pesa code or transaction hash:');
-                        if (ref === null) return; act({ action: 'payout_paid', id: r.id, reference: ref.trim() }); } }));
-                    btns.appendChild(el('button', { text: 'Reject', onclick: function () {
-                        var note = prompt('Reason (the operator sees this). You can leave it blank:', '');
-                        if (note === null) return; act({ action: 'payout_reject', id: r.id, note: note.trim() }); } }));
+                    if (sending) {
+                        var mins = Math.max(0, Math.floor((Date.now() - new Date(r.sent_at).getTime()) / 60000));
+                        btns.appendChild(el('span', { class: 'muted', text: 'Sending\u2026 ' + mins + ' min' }));
+                        if (mins >= 10) btns.appendChild(el('button', { text: 'Release (I checked M-Pesa)', onclick: function () {
+                            if (confirm('Open your M-Pesa statement first. Only release this if NOTHING was sent to ' + r.destination + '. Continue?')) act({ action: 'payout_release', id: r.id }); } }));
+                    } else {
+                        if (r.method === 'mpesa' && cm.b2c_ready) btns.appendChild(el('button', { class: 'primary', text: 'Pay with M-Pesa', onclick: function () {
+                            if (confirm('Send ' + usd(r.amount_usd) + ' (in shillings at today\u2019s rate) to M-Pesa ' + r.destination + ' now? It ticks to paid by itself when M-Pesa confirms.')) act({ action: 'payout_send', id: r.id }); } }));
+                        btns.appendChild(el('button', { class: r.method === 'mpesa' && cm.b2c_ready ? '' : 'primary', text: 'Mark paid (sent another way)', onclick: function () {
+                            var ref = prompt('Pay ' + usd(r.amount_usd) + ' to ' + (r.method === 'mpesa' ? 'M-Pesa ' : 'USDT ' + r.network + ' ') + r.destination + '. Then enter the M-Pesa code or transaction hash:');
+                            if (ref === null) return; act({ action: 'payout_paid', id: r.id, reference: ref.trim() }); } }));
+                        btns.appendChild(el('button', { text: 'Reject', onclick: function () {
+                            var note = prompt('Reason (the operator sees this). You can leave it blank:', '');
+                            if (note === null) return; act({ action: 'payout_reject', id: r.id, note: note.trim() }); } }));
+                    }
                 }
-                return [new Date(r.created_at).toLocaleString(), (r.owner_name || '') + ' ' + (r.owner_email || ''), r.site_domain || '', usd(r.amount_usd),
-                    (r.method === 'mpesa' ? 'M-Pesa ' : 'USDT ' + (r.network || '') + ' ') + r.destination, el('span', { class: 'pill', text: r.status + (r.reference ? ' · ' + r.reference : '') }), btns];
+                var label = r.status === 'requested' ? (sending ? 'sending' : (r.send_error ? 'pending' : 'requested')) : r.status;
+                var statusCell = el('div', {}, [el('span', { class: 'pill' + (r.status === 'requested' && (sending || r.send_error) ? ' bad' : ''), text: label + (r.reference ? ' \u00b7 ' + r.reference : '') }),
+                    r.send_error && r.status !== 'paid' || (r.send_error && /^DUPLICATE/.test(r.send_error)) ? el('div', { class: 'muted small', text: r.send_error }) : null]);
+                return [new Date(r.created_at).toLocaleString(), (r.owner_name || '') + ' ' + (r.owner_email || ''), r.site_domain || '', usd(r.amount_usd) + (r.sent_kes ? ' (KES ' + r.sent_kes + ')' : ''),
+                    (r.method === 'mpesa' ? 'M-Pesa ' : 'USDT ' + (r.network || '') + ' ') + r.destination, statusCell, btns];
             });
             app.appendChild(el('div', { class: 'card' }, [el('h2', { text: 'Commissions' }), el('p', { class: 'muted', text: intro }),
                 el('div', { class: 'row' }, [el('span', { class: 'muted', text: 'From' }), from, el('span', { class: 'muted', text: 'to' }), to, syncBtn, cmMsg]),
