@@ -2,6 +2,9 @@
 :root{--navy:#0b1f3a;--navy2:#13335c;--gold:#c9a24b;--gold-d:#8a6420;--bg:#f6f3ec;--card:#fff;--line:#e8e2d4;--text:#0f1c2e;--muted:#5b6675;--bad:#b3261e;--ok:#14632c;--warn:#8a5a00;--serif:Georgia,"Times New Roman",serif;--sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Arial,sans-serif}
 *{box-sizing:border-box}html,body{height:100%}
 body{margin:0;background:var(--bg);color:var(--text);font:15px/1.55 var(--sans)}
+/* Wallpaper: a fixed layer behind everything (a fixed layer scrolls smoothly on phones, unlike background-attachment). Cards stay solid white so text is always easy to read. */
+body::before{content:"";position:fixed;inset:0;z-index:-1;background:var(--bg) url(/app/wallpaper.svg) center/cover no-repeat;pointer-events:none}
+.card,.stat,.banner{box-shadow:0 1px 2px rgba(15,28,46,.04),0 10px 28px rgba(15,28,46,.06)}
 h1,h2,h3{font-family:var(--serif);font-weight:600;margin:0;letter-spacing:-.01em}
 a{color:var(--gold-d)}button,input,select,textarea{font:inherit;color:inherit}
 .hidden{display:none!important}.muted{color:var(--muted)}.small{font-size:.84rem}
