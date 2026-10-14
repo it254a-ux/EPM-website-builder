@@ -12,7 +12,7 @@ const dbPath = require.resolve('../_lib/db.js');
 require.cache[dbPath] = { id: dbPath, filename: dbPath, loaded: true, exports: { getDb: () => sql } };
 const admin = require('../admin');
 const commissions = require('../commissions');
-const payB2c = require('../pay-b2c');
+const payB2c = require('../pay-callback');
 const A = require('../_lib/auth');
 const M = require('../_lib/mpesa');
 const PO = require('../_lib/payouts');
@@ -107,8 +107,8 @@ test('Pay with M-Pesa sends the right request and waits for Safaricom before tic
     assert.equal(sent.body.CommandID, 'BusinessPayment');
     assert.equal(sent.body.Amount, 6460);
     assert.equal(sent.body.PartyA, '600984'); assert.equal(sent.body.PartyB, '254712345678');
-    assert.equal(sent.body.ResultURL, `https://${HOST}/api/pay-b2c?k=${SECRET}&p=${id}&t=result`);
-    assert.equal(sent.body.QueueTimeOutURL, `https://${HOST}/api/pay-b2c?k=${SECRET}&p=${id}&t=timeout`);
+    assert.equal(sent.body.ResultURL, `https://${HOST}/api/pay-callback?k=${SECRET}&p=${id}&t=result`);
+    assert.equal(sent.body.QueueTimeOutURL, `https://${HOST}/api/pay-callback?k=${SECRET}&p=${id}&t=timeout`);
     assert.ok(!JSON.stringify(r.body).includes('READY-MADE'));
 
     let o = await row(id);

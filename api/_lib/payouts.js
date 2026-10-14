@@ -2,7 +2,7 @@
 //
 // While the money is in flight the request stays status 'requested' (so every balance rule keeps working) and send_state is 'sending'.
 //   send       one UPDATE claims the request (only one click can win), then Safaricom is asked to send.
-//   result     Safaricom reports back to /api/pay-b2c. Success -> status 'paid' with its receipt as the reference. Failure -> back to pending, with the reason.
+//   result     Safaricom reports back to /api/pay-callback. Success -> status 'paid' with its receipt as the reference. Failure -> back to pending, with the reason.
 //   unclear    no answer from Safaricom: it stays 'sending' for a person to check the M-Pesa statement, then "Release" it.
 // Manual paying (outside the system) is unchanged: "Mark paid" with a reference. It is blocked while a send is in flight.
 
@@ -12,7 +12,7 @@ const FX = require('./fx');
 const RELEASE_AFTER_MINUTES = 10;
 
 const callbackUrls = (host, id) => {
-    const base = `https://${host}/api/pay-b2c?k=${encodeURIComponent(M.settings().callbackSecret)}&p=${id}`;
+    const base = `https://${host}/api/pay-callback?k=${encodeURIComponent(M.settings().callbackSecret)}&p=${id}`;
     return { resultUrl: base + '&t=result', timeoutUrl: base + '&t=timeout' };
 };
 
